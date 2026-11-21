@@ -25,6 +25,8 @@ export interface YoutubeVideoItem {
   level: CefrLevel;
   views: string;
   subtitles: YoutubeSubtitleSegment[];
+  isCustomImported?: boolean; // Đánh dấu video do người dùng tự nhập và đã lưu bền vững
+  savedAt?: string;
 }
 
 export type ExtractionStatus = 'idle' | 'extracting' | 'translating' | 'ready' | 'error';

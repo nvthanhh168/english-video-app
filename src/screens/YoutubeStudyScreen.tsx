@@ -17,10 +17,12 @@ import {
 import { YoutubeSubtitleFeed } from '../components/youtube/YoutubeSubtitleFeed';
 import { YoutubeStudyToolbar } from '../components/youtube/YoutubeStudyToolbar';
 import { SentenceBreakdownSheet } from './SentenceBreakdownSheet';
+import { CustomSubtitleModal } from '../components/youtube/CustomSubtitleModal';
 
 interface YoutubeStudyScreenProps {
   video: YoutubeVideoItem;
   onBack: () => void;
+  onUpdateSubtitles?: (videoId: string, newSubs: YoutubeSubtitleSegment[]) => void;
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25];
@@ -28,6 +30,7 @@ const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25];
 export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
   video,
   onBack,
+  onUpdateSubtitles,
 }) => {
   const playerRef = useRef<CustomYoutubePlayerRef>(null);
 
@@ -35,6 +38,17 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
   const [playbackRateIndex, setPlaybackRateIndex] = useState<number>(2); // Default 1.0x
   const [currentTimeSec, setCurrentTimeSec] = useState<number>(0);
   const [isLoopingSentence, setIsLoopingSentence] = useState<boolean>(false);
+  const [subtitles, setSubtitles] = useState<YoutubeSubtitleSegment[]>(video.subtitles);
+  const [customSubModalVisible, setCustomSubModalVisible] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSubtitles(video.subtitles);
+  }, [video.subtitles]);
+
+  const handleSaveSubtitles = (newSubs: YoutubeSubtitleSegment[]) => {
+    setSubtitles(newSubs);
+    onUpdateSubtitles?.(video.id, newSubs);
+  };
 
   // Modal phân tích AI Module 3
   const [breakdownVisible, setBreakdownVisible] = useState<boolean>(false);
@@ -50,11 +64,11 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
   // 2. Nếu rơi vào khoảng lặng tự nhiên (pause giữa 2 câu), giữ câu vừa phát gần nhất
   // 3. Nếu ở đầu video, lấy câu đầu tiên
   const activeSubtitle =
-    video.subtitles.find(
+    subtitles.find(
       (sub) => currentTimeSec >= sub.start && currentTimeSec <= sub.end
     ) ||
-    [...video.subtitles].reverse().find((sub) => currentTimeSec >= sub.start) ||
-    (video.subtitles.length > 0 ? video.subtitles[0] : null);
+    [...subtitles].reverse().find((sub) => currentTimeSec >= sub.start) ||
+    (subtitles.length > 0 ? subtitles[0] : null);
 
   // Xử lý logic lặp lại câu (A-B Looping)
   useEffect(() => {
@@ -122,6 +136,18 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
             {video.channelTitle} • {video.level}
           </Text>
         </View>
+
+        {/* Nút tùy chỉnh / dán phụ đề */}
+        <TouchableOpacity
+          style={styles.editSubsTopBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setCustomSubModalVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.editSubsTopBtnText}>✏️ Sửa phụ đề</Text>
+        </TouchableOpacity>
       </View>
 
       {/* 2. Trình phát YouTube Không Quảng Cáo (Clean Player) */}
@@ -137,7 +163,7 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
       {/* 3. Danh sách Phụ đề Song ngữ đồng bộ theo thời gian thực */}
       <View style={styles.subtitlesContainer}>
         <YoutubeSubtitleFeed
-          subtitles={video.subtitles}
+          subtitles={subtitles}
           currentTimeSec={currentTimeSec}
           activeSubtitleId={activeSubtitle?.id || null}
           isLoopingSentence={isLoopingSentence}
@@ -171,6 +197,14 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
           sentence={selectedSentence || undefined}
         />
       </Modal>
+
+      {/* 6. Modal Tùy chỉnh / Dán Phụ đề */}
+      <CustomSubtitleModal
+        visible={customSubModalVisible}
+        onClose={() => setCustomSubModalVisible(false)}
+        currentSubtitles={subtitles}
+        onSaveSubtitles={handleSaveSubtitles}
+      />
     </SafeAreaView>
   );
 };
@@ -189,6 +223,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     gap: 12,
+  },
+  editSubsTopBtn: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  editSubsTopBtnText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   backBtn: {
     width: 36,

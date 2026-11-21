@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,21 +10,50 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { YoutubeVideoItem } from '../types/youtube';
+import { YoutubeVideoItem, YoutubeSubtitleSegment } from '../types/youtube';
 import { MOCK_YOUTUBE_LIBRARY } from '../data/mockYoutubeLibrary';
 import { YoutubeURLInput } from '../components/youtube/YoutubeURLInput';
 import { LevelVideoFeed } from '../components/youtube/LevelVideoFeed';
+import { SavedVideosSection } from '../components/youtube/SavedVideosSection';
 import { YoutubeStudyScreen } from './YoutubeStudyScreen';
 import {
   extractVideoId,
   extractAndTranslateYoutubeSubtitles,
   fetchYoutubeVideoMeta,
 } from '../services/youtubeExtractor';
+import {
+  getSavedVideos,
+  saveVideoToStorage,
+  removeSavedVideoFromStorage,
+  updateVideoSubtitlesInStorage,
+} from '../services/savedVideosStorage';
 
 export const YoutubeDiscoveryScreen: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<YoutubeVideoItem | null>(null);
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>('Đang phân tích và dịch phụ đề AI...');
+  const [savedVideos, setSavedVideos] = useState<YoutubeVideoItem[]>([]);
+
+  // Tải danh sách video đã lưu bền vững trên Web khi khởi chạy
+  useEffect(() => {
+    setSavedVideos(getSavedVideos());
+  }, []);
+
+  const handleDeleteSavedVideo = (videoId: string) => {
+    const updated = removeSavedVideoFromStorage(videoId);
+    setSavedVideos(updated);
+  };
+
+  const handleUpdateSubtitles = (videoId: string, newSubs: YoutubeSubtitleSegment[]) => {
+    const updated = updateVideoSubtitlesInStorage(videoId, newSubs);
+    setSavedVideos(updated);
+    if (selectedVideo && selectedVideo.id === videoId) {
+      setSelectedVideo({
+        ...selectedVideo,
+        subtitles: newSubs,
+      });
+    }
+  };
 
   // Xử lý khi người dùng dán link và nhấn "Học ngay"
   const handleImportUrl = async (url: string) => {
@@ -39,15 +68,26 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
 
     try {
       setIsExtracting(true);
-      setLoadingText('Đang phân tích và dịch phụ đề AI...');
+      setLoadingText('Đang phân tích video & lưu vào thư viện...');
 
-      // Kiểm tra xem video này đã có sẵn trong mock library chưa
-      const existing = MOCK_YOUTUBE_LIBRARY.find((v) => v.id === videoId);
-      if (existing) {
+      // 1. Kiểm tra xem video này đã có sẵn trong mock library hoặc đã lưu trước đó chưa
+      const existingInSaved = savedVideos.find((v) => v.id === videoId);
+      if (existingInSaved) {
         setTimeout(() => {
           setIsExtracting(false);
-          setSelectedVideo(existing);
-        }, 500);
+          setSelectedVideo(existingInSaved);
+        }, 400);
+        return;
+      }
+
+      const existingInLib = MOCK_YOUTUBE_LIBRARY.find((v) => v.id === videoId);
+      if (existingInLib) {
+        const updated = saveVideoToStorage(existingInLib);
+        setSavedVideos(updated);
+        setTimeout(() => {
+          setIsExtracting(false);
+          setSelectedVideo(existingInLib);
+        }, 400);
         return;
       }
 
@@ -67,7 +107,12 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
         level: 'B2',
         views: '100K+',
         subtitles: extractedSubtitles,
+        isCustomImported: true,
       };
+
+      // 4. LƯU BỀN VỮNG VÀO WEB APP (Không bị mất khi reload hoặc tắt web)
+      const updatedSaved = saveVideoToStorage(customVideoItem);
+      setSavedVideos(updatedSaved);
 
       setIsExtracting(false);
       setSelectedVideo(customVideoItem);
@@ -82,10 +127,21 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
     return (
       <YoutubeStudyScreen
         video={selectedVideo}
-        onBack={() => setSelectedVideo(null)}
+        onBack={() => {
+          // Khi quay lại danh sách, làm mới danh sách video đã lưu
+          setSavedVideos(getSavedVideos());
+          setSelectedVideo(null);
+        }}
+        onUpdateSubtitles={handleUpdateSubtitles}
       />
     );
   }
+
+  // Kết hợp video đã lưu của người dùng và video thư viện mẫu (không trùng ID)
+  const allVideos = [
+    ...savedVideos,
+    ...MOCK_YOUTUBE_LIBRARY.filter((mv) => !savedVideos.some((sv) => sv.id === mv.id)),
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -115,9 +171,16 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
           isLoading={isExtracting}
         />
 
+        {/* Khu vực 1.5: Danh sách video người dùng đã nhập và được lưu vĩnh viễn */}
+        <SavedVideosSection
+          videos={savedVideos}
+          onSelectVideo={setSelectedVideo}
+          onDeleteVideo={handleDeleteSavedVideo}
+        />
+
         {/* Khu vực 2: Thư viện video phân theo cấp độ CEFR */}
         <LevelVideoFeed
-          videos={MOCK_YOUTUBE_LIBRARY}
+          videos={allVideos}
           onSelectVideo={setSelectedVideo}
         />
       </ScrollView>
