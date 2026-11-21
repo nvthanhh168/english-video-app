@@ -40,6 +40,7 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
   const [isLoopingSentence, setIsLoopingSentence] = useState<boolean>(false);
   const [subtitles, setSubtitles] = useState<YoutubeSubtitleSegment[]>(video.subtitles);
   const [customSubModalVisible, setCustomSubModalVisible] = useState<boolean>(false);
+  const [showInVideoSubtitle, setShowInVideoSubtitle] = useState<boolean>(true); // Phụ đề nổi đè lên video zIndex 9999
 
   useEffect(() => {
     setSubtitles(video.subtitles);
@@ -175,6 +176,20 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
           </Text>
         </View>
 
+        {/* Nút bật/tắt Phụ đề nổi đè lên video (Z-Index 9999 CC Overlay) */}
+        <TouchableOpacity
+          style={[styles.ccToggleBtn, showInVideoSubtitle && styles.ccToggleBtnActive]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowInVideoSubtitle((prev) => !prev);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.ccToggleText, showInVideoSubtitle && styles.ccToggleTextActive]}>
+            {showInVideoSubtitle ? '💬 CC Trên' : '💬 CC Tắt'}
+          </Text>
+        </TouchableOpacity>
+
         {/* Nút tùy chỉnh / dán phụ đề */}
         <TouchableOpacity
           style={styles.editSubsTopBtn}
@@ -188,17 +203,19 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* 2. Trình phát YouTube Không Quảng Cáo (Clean Player) */}
+      {/* 2. Trình phát YouTube Không Quảng Cáo (Clean Player) kèm Subtitle Overlay zIndex: 9999 */}
       <CustomYoutubePlayer
         ref={playerRef}
         videoId={video.id}
         isPlaying={isPlaying}
         playbackRate={playbackRate}
+        activeSubtitle={activeSubtitle}
+        showInVideoSubtitle={showInVideoSubtitle}
         onTogglePlayPause={handleTogglePlayPause}
         onTimeUpdate={setCurrentTimeSec}
       />
 
-      {/* 3. Danh sách Phụ đề Song ngữ đồng bộ theo thời gian thực */}
+      {/* 3. Danh sách Phụ đề Song ngữ đồng bộ: Bọc trong View có flex: 1 nằm ngay dưới khung Video theo YÊU CẦU 2 */}
       <View style={styles.subtitlesContainer}>
         <YoutubeSubtitleFeed
           subtitles={subtitles}
@@ -262,6 +279,26 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     gap: 12,
   },
+  ccToggleBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  ccToggleBtnActive: {
+    backgroundColor: 'rgba(34, 197, 94, 0.18)',
+    borderColor: 'rgba(34, 197, 94, 0.5)',
+  },
+  ccToggleText: {
+    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  ccToggleTextActive: {
+    color: '#4ADE80',
+  },
   editSubsTopBtn: {
     backgroundColor: 'rgba(56, 189, 248, 0.15)',
     borderWidth: 1,
@@ -303,7 +340,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   subtitlesContainer: {
-    flex: 1,
+    flex: 1, // Bọc trong View có flex: 1 nằm ngay dưới khung Video theo YÊU CẦU 2
     backgroundColor: '#0A0F1D',
+    overflow: 'hidden',
   },
 });

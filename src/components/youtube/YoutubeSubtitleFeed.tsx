@@ -209,21 +209,21 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   subtitleCard: {
-    backgroundColor: '#131D31',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Background bán trong suốt theo YÊU CẦU 2 để chữ trắng không bị chìm vào nền
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   subtitleCardActive: {
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
     borderColor: '#38BDF8',
     shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
   subMetaRow: {
     flexDirection: 'row',

@@ -31,13 +31,26 @@ interface CustomYoutubePlayerProps {
   videoId: string;
   isPlaying: boolean;
   playbackRate: number; // 0.5, 0.75, 1.0, 1.25
+  activeSubtitle?: {
+    textEn: string;
+    textVi: string;
+  } | null;
+  showInVideoSubtitle?: boolean;
   onTogglePlayPause: () => void;
   onTimeUpdate: (currentTimeSec: number) => void;
 }
 
 export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYoutubePlayerProps>(
   (
-    { videoId, isPlaying, playbackRate, onTogglePlayPause, onTimeUpdate },
+    {
+      videoId,
+      isPlaying,
+      playbackRate,
+      activeSubtitle,
+      showInVideoSubtitle = true,
+      onTogglePlayPause,
+      onTimeUpdate,
+    },
     ref
   ) => {
     const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -240,6 +253,22 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Subtitle Container đè thẳng lên video theo YÊU CẦU 2 (Z-INDEX FIX) */}
+        {activeSubtitle && showInVideoSubtitle && (
+          <View style={styles.inVideoSubtitleContainer} pointerEvents="none">
+            <View style={styles.inVideoSubtitleCard}>
+              <Text style={styles.inVideoTextEn} numberOfLines={2}>
+                {activeSubtitle.textEn}
+              </Text>
+              {activeSubtitle.textVi ? (
+                <Text style={styles.inVideoTextVi} numberOfLines={2}>
+                  {activeSubtitle.textVi}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
       </View>
     );
   }
@@ -262,6 +291,45 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     zIndex: 10,
+  },
+  inVideoSubtitleContainer: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    elevation: 99,
+    zIndex: 9999, // Chắc chắn nó luôn nổi lên trên cùng theo YÊU CẦU 2
+  },
+  inVideoSubtitleCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Background bán trong suốt theo YÊU CẦU 2 để chữ trắng không bị chìm vào nền video
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    maxWidth: '92%',
+    alignItems: 'center',
+  },
+  inVideoTextEn: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  inVideoTextVi: {
+    color: '#38BDF8',
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 3,
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   adFreeBadge: {
     position: 'absolute',
