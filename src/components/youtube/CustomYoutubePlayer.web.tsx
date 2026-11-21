@@ -94,18 +94,32 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       }
     }, []);
 
-    // 2. Khởi tạo YT.Player khi API sẵn sàng
+    // 2. Khởi tạo hoặc cập nhật YT.Player khi API sẵn sàng và videoId thay đổi
     useEffect(() => {
       if (!isApiReady || typeof window === 'undefined') return;
 
-      try {
-        if (playerInstanceRef.current) {
-          playerInstanceRef.current.destroy();
+      // Nếu player đã tồn tại, dùng loadVideoById để chuyển video mượt mà, không hủy DOM
+      if (playerInstanceRef.current && typeof playerInstanceRef.current.loadVideoById === 'function') {
+        try {
+          playerInstanceRef.current.loadVideoById(videoId);
+          if (isPlaying) {
+            playerInstanceRef.current.playVideo?.();
+          } else {
+            playerInstanceRef.current.pauseVideo?.();
+          }
+          return;
+        } catch (e) {
+          console.warn('[CustomYoutubePlayer] Lỗi loadVideoById, khởi tạo lại:', e);
         }
+      }
+
+      try {
+        const containerElem = document.getElementById(containerId);
+        if (!containerElem) return;
 
         playerInstanceRef.current = new window.YT.Player(containerId, {
           videoId: videoId,
-          height: '220',
+          height: '250',
           width: '100%',
           playerVars: {
             autoplay: 1,
@@ -113,7 +127,7 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
             rel: 0,             // Không hiện video liên quan
             modestbranding: 1,  // Ẩn logo YouTube
             iv_load_policy: 3,  // Ẩn chú thích và pop-up
-            playsinline: 1,
+            playsinline: 1,     // Ép buộc phát inline
             enablejsapi: 1,
             disablekb: 1,       // Vô hiệu hóa phím tắt của YouTube
             fs: 0,              // Tắt nút toàn màn hình mặc định
@@ -132,23 +146,12 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
             },
             onStateChange: (event: any) => {
               // 1: PLAYING, 2: PAUSED
-              if (event.data === 1 && !isPlaying) {
-                // đồng bộ khi player tự động phát
-              }
             },
           },
         });
       } catch (err) {
         console.warn('[CustomYoutubePlayer] Không thể tạo YT.Player:', err);
       }
-
-      return () => {
-        try {
-          if (playerInstanceRef.current && typeof playerInstanceRef.current.destroy === 'function') {
-            playerInstanceRef.current.destroy();
-          }
-        } catch {}
-      };
     }, [isApiReady, videoId]);
 
     // 3. Đồng bộ Play / Pause thực tế
@@ -245,13 +248,13 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 220,
+    height: 250, // Cố định 250px theo YÊU CẦU 1, không dùng flex: 1 để chừa khoảng trống cho phụ đề bên dưới
     backgroundColor: '#000000',
     position: 'relative',
   },
   videoWrapper: {
     width: '100%',
-    height: 220,
+    height: 250,
     overflow: 'hidden',
     backgroundColor: '#000000',
   },

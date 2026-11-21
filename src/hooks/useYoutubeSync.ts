@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Haptics from 'expo-haptics';
 import { saveImportedVideo } from '../services/importedVideosStorage';
+import { extractVideoId, extractAndTranslateYoutubeSubtitles, fetchYoutubeVideoMeta } from '../services/youtubeExtractor';
 
 export interface YoutubeApiSubtitle {
   id: string;
@@ -215,44 +216,37 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
           throw new Error(json.error || 'Dữ liệu trả về không hợp lệ');
         }
       } catch (err: any) {
-        console.warn('[useYoutubeSync] API backend gặp sự cố. Sử dụng fallback cục bộ:', err.message);
+        console.warn('[useYoutubeSync] API backend gặp sự cố. Sử dụng trích xuất phụ đề thật:', err.message);
 
-        // Fallback tự động khi backend offline để đảm bảo trải nghiệm người dùng
-        const fallbackId = 'h6fcK_fRYaI';
-        const fallbackSubs: YoutubeApiSubtitle[] = [
-          {
-            id: 'sub_0',
-            startTime: 0,
-            duration: 4500,
-            english: 'Welcome back! Today we are exploring an incredible idea that will change your mind.',
-            vietnamese: 'Chào mừng các bạn quay trở lại! Hôm nay chúng ta sẽ khám phá một ý tưởng tuyệt vời có thể thay đổi suy nghĩ của bạn.',
-          },
-          {
-            id: 'sub_1',
-            startTime: 4500,
-            duration: 4500,
-            english: 'Most people believe that success comes from pure talent, but the truth is quite different.',
-            vietnamese: 'Hầu hết mọi người tin rằng thành công đến từ tài năng thuần túy, nhưng sự thật thì hoàn toàn khác.',
-          },
-          {
-            id: 'sub_2',
-            startTime: 9000,
-            duration: 5200,
-            english: 'It is about continuous daily immersion and taking small, consistent steps every single day.',
-            vietnamese: 'Đó là về sự ngấm ngôn ngữ liên tục mỗi ngày và thực hiện những bước đi nhỏ, đều đặn từng ngày.',
-          },
-          {
-            id: 'sub_3',
-            startTime: 14200,
-            duration: 5800,
-            english: 'When you listen carefully to native speakers, your subconscious begins to absorb natural sentence patterns.',
-            vietnamese: 'Khi bạn lắng nghe cẩn thận người bản xứ, tiềm thức của bạn sẽ bắt đầu tiếp thu những mẫu câu tự nhiên.',
-          },
-        ];
+        const videoId = extractVideoId(url);
+        if (videoId) {
+          const meta = await fetchYoutubeVideoMeta(videoId);
+          const realSubs = await extractAndTranslateYoutubeSubtitles(videoId, meta.title);
 
-        setSubtitles(fallbackSubs);
+          const apiSubs: YoutubeApiSubtitle[] = realSubs.map((s, idx) => ({
+            id: s.id || `sub_${idx}`,
+            startTime: Math.round(s.start * 1000),
+            duration: Math.round((s.end - s.start) * 1000),
+            english: s.textEn,
+            vietnamese: s.textVi,
+          }));
+
+          saveImportedVideo({
+            videoId,
+            title: meta.title,
+            thumbnail: meta.thumbnailUrl,
+            platform: 'youtube',
+            importedAt: new Date().toISOString(),
+            subtitles: realSubs,
+          }).catch(() => {});
+
+          setSubtitles(apiSubs);
+          setIsLoading(false);
+          return { videoId, subtitles: apiSubs };
+        }
+
         setIsLoading(false);
-        return { videoId: fallbackId, subtitles: fallbackSubs };
+        return null;
       }
     },
     [backendUrl]

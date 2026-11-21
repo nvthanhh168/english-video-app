@@ -96,23 +96,29 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
     return (
       <View style={styles.container}>
         {/* 
-          Thủ thuật Chặn UI & Quảng cáo YouTube: 
-          1. pointerEvents="none" chặn mọi click trực tiếp vào Iframe gốc của YouTube (chặn click quảng cáo, gợi ý, logo).
-          2. playerVars ẩn controls, rel=0, modestbranding=1, iv_load_policy=3
+          Thủ thuật Chặn UI, Chặn Native Fullscreen & Quảng cáo YouTube: 
+          1. webViewProps={{ allowsInlineMediaPlayback: true }} ép WKWebView trên iOS không bung AVPlayer fullscreen.
+          2. initialPlayerParams={{ playsinline: 1, preventFullScreen: true, controls: 0, modestbranding: 1 }}
+          3. Thẻ bọc có chiều cao cố định (height: 250), không dùng flex: 1 để chừa khoảng trống cho phụ đề bên dưới.
+          4. pointerEvents="none" chặn mọi click trực tiếp vào Iframe gốc của YouTube.
         */}
         <View style={styles.videoWrapper} pointerEvents="none">
           <YoutubePlayer
             ref={playerRef}
-            height={220}
+            height={250}
             width={SCREEN_WIDTH}
             play={isPlaying}
             videoId={videoId}
+            webViewProps={{
+              allowsInlineMediaPlayback: true,
+            }}
             initialPlayerParams={{
+              playsinline: 1,
               preventFullScreen: true,
-              controls: false, // Ẩn hoàn toàn thanh điều khiển gốc của YouTube
-              rel: false,      // Không hiện video đề xuất
-              modestbranding: true,
-              iv_load_policy: 3, // Ẩn chú thích và banner pop-up
+              controls: 0,
+              modestbranding: 1,
+              rel: false,
+              iv_load_policy: 3,
             } as any}
           />
         </View>
@@ -146,13 +152,13 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 220,
+    height: 250, // Chiều cao cố định theo YÊU CẦU 1, không dùng flex: 1 để chừa khoảng trống cho phụ đề bên dưới
     backgroundColor: '#000000',
     position: 'relative',
   },
   videoWrapper: {
     width: '100%',
-    height: 220,
+    height: 250, // Cố định 250px cho video inline
     overflow: 'hidden',
     backgroundColor: '#000000',
   },

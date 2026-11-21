@@ -96,7 +96,9 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
         return;
       }
 
-      const existingInLib = MOCK_YOUTUBE_LIBRARY.find((v) => v.id === videoId);
+      const existingInLib =
+        MOCK_LEVEL_LIBRARY.find((v) => v.id === videoId || (v as any).videoId === videoId) ||
+        MOCK_YOUTUBE_LIBRARY.find((v) => v.id === videoId);
       if (existingInLib) {
         await saveImportedVideo({
           videoId: existingInLib.id,

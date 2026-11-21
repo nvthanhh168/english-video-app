@@ -1,5 +1,3 @@
-// @ts-ignore
-import translate from 'google-translate-api-x';
 import { RawYoutubeCaption } from './youtubeScraper';
 
 export interface KeyWordHighlight {
@@ -86,6 +84,10 @@ const extractSampleKeywords = (textEn: string): KeyWordHighlight[] => {
     'barriers': 'rào cản',
     'frictions': 'trở ngại, ma sát',
     'incentives': 'động lực thúc đẩy',
+    'wake up': 'thức dậy',
+    'get up': 'rời giường, thức dậy',
+    'have breakfast': 'ăn sáng',
+    'brush my teeth': 'đánh răng',
   };
 
   const lower = textEn.toLowerCase();
@@ -98,6 +100,7 @@ const extractSampleKeywords = (textEn: string): KeyWordHighlight[] => {
         meaningVi: meaning,
         highlightColor: '#22C55E',
       });
+      if (matchedKeywords.length >= 2) break;
     }
   }
 
@@ -105,7 +108,8 @@ const extractSampleKeywords = (textEn: string): KeyWordHighlight[] => {
 };
 
 /**
- * Dịch từng chunk văn bản tiếng Anh sang tiếng Việt với cơ chế retry và đảm bảo số lượng 1-1
+ * Dịch từng chunk văn bản tiếng Anh sang tiếng Việt bằng Google Translate API (gtx)
+ * Đảm bảo 100% khớp chính xác số câu đầu vào và đầu ra
  */
 async function translateChunkWithRetry(
   texts: string[],
@@ -115,39 +119,40 @@ async function translateChunkWithRetry(
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Gọi thư viện google-translate-api-x cho cả mảng chuỗi
-      const res = await translate(texts, { to: 'vi' });
+      const joined = texts.join('\n');
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(
+        joined
+      )}`;
 
-      let chunkTranslations: string[] = [];
-      if (Array.isArray(res)) {
-        chunkTranslations = res.map((r: any) => (r && typeof r.text === 'string' ? r.text : ''));
-      } else if (res && typeof res.text === 'string') {
-        chunkTranslations = [res.text];
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Google Translate HTTP ${res.status}`);
+
+      const data = await res.json();
+      if (!data || !Array.isArray(data[0])) throw new Error('Cấu trúc trả về không đúng');
+
+      const fullTranslatedText = data[0].map((item: any) => item[0]).join('');
+      const translatedLines = fullTranslatedText.split('\n');
+
+      if (translatedLines.length === texts.length) {
+        return translatedLines.map((line, idx) => line.trim() || texts[idx]);
       }
 
-      // Đảm bảo số lượng phần tử trả về khớp chính xác số câu đầu vào
-      if (chunkTranslations.length === texts.length) {
-        return chunkTranslations;
-      }
-
-      // Nếu API trả về lệch số phần tử (do xuống dòng hoặc gom câu), căn chỉnh lại 1-1
-      const normalized: string[] = texts.map((orig, idx) => {
-        return chunkTranslations[idx] && typeof chunkTranslations[idx] === 'string'
-          ? chunkTranslations[idx]
+      // Nếu số dòng bị chênh lệch do xuống dòng tự nhiên, map 1-1
+      return texts.map((orig, idx) => {
+        return translatedLines[idx] && translatedLines[idx].trim().length > 0
+          ? translatedLines[idx].trim()
           : orig;
       });
-
-      return normalized;
     } catch (err: any) {
       console.warn(`[translatorService] Thử lại chunk dịch (lần ${attempt}/${retries}): ${err.message}`);
       if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+        await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
       }
     }
   }
 
-  // Fallback an toàn nếu cả các lần thử lại đều lỗi: Trả về văn bản gốc, không làm mất câu
-  return texts.map((t) => t);
+  // Fallback an toàn: giữ nguyên văn bản gốc nếu API lỗi
+  return texts;
 }
 
 /**
@@ -198,36 +203,32 @@ export const processAndTranslateCaptions = async (
   // 4. Gộp (Flatten) tất cả các chunk thành một mảng duy nhất
   const flattenedTranslations: string[] = translatedChunks.flat();
 
-  // Đảm bảo tuyệt đối: Số lượng bản dịch phải khớp chính xác với số câu gốc
-  const finalTranslations: string[] = cleanedCaptions.map((item, idx) => {
-    return flattenedTranslations[idx] && typeof flattenedTranslations[idx] === 'string'
-      ? flattenedTranslations[idx]
-      : item.text;
-  });
+  // 5. Map vào định dạng startTime và duration chuẩn đồng bộ của Frontend
+  const finalSubtitles: FormattedSubtitle[] = cleanedCaptions.map((cap, index) => {
+    const startSec = cap.start;
+    const durSec = cap.dur > 0 ? cap.dur : 3.5;
+    const endSec = parseFloat((startSec + durSec).toFixed(3));
 
-  console.log(
-    `[translatorService] Hoàn tất dịch: ${finalTranslations.length}/${TOTAL_COUNT} câu phụ đề song ngữ.`
-  );
-
-  // 5. Map vào định dạng chuẩn FormattedSubtitle với startTime, duration, start, end
-  const formattedSubtitles: FormattedSubtitle[] = cleanedCaptions.map((cap, index) => {
-    const startSec = Math.round(cap.start * 100) / 100;
-    const endSec = Math.round((cap.start + cap.dur) * 100) / 100;
-    const viText = finalTranslations[index] || cap.text;
+    const textEn = cap.text;
+    const textVi = flattenedTranslations[index] || textEn;
 
     return {
       id: `sub_${index + 1}`,
       start: startSec,
       end: endSec,
       startTime: Math.round(startSec * 1000),
-      duration: Math.round(cap.dur * 1000),
-      textEn: cap.text,
-      textVi: viText,
-      english: cap.text,
-      vietnamese: viText,
-      keyWords: extractSampleKeywords(cap.text),
+      duration: Math.round(durSec * 1000),
+      textEn,
+      textVi,
+      english: textEn,
+      vietnamese: textVi,
+      keyWords: extractSampleKeywords(textEn),
     };
   });
 
-  return formattedSubtitles;
+  console.log(
+    `[translatorService] Hoàn tất xử lý ${finalSubtitles.length}/${TOTAL_COUNT} câu phụ đề song ngữ.`
+  );
+
+  return finalSubtitles;
 };
