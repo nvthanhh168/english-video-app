@@ -22,6 +22,21 @@ export interface FormattedSubtitle {
 }
 
 /**
+ * Thuật toán Chunking Array: Cắt mảng lớn thành các mảng nhỏ (tối đa 30 - 50 câu/chunk)
+ * @param array Mảng ban đầu
+ * @param size Số lượng phần tử tối đa cho mỗi chunk (mặc định 35 câu)
+ */
+export const chunkArray = <T>(array: T[], size: number): T[][] => {
+  if (!array || array.length === 0) return [];
+  const chunkSize = Math.max(1, size);
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+/**
  * Làm sạch chuỗi phụ đề: Xóa thẻ HTML, giải mã ký tự đặc biệt, gộp khoảng trắng
  */
 export const cleanSubtitleText = (text: string): string => {
@@ -63,6 +78,14 @@ const extractSampleKeywords = (textEn: string): KeyWordHighlight[] => {
     'waste': 'lãng phí',
     'drown out': 'lấn át, át đi',
     'inner voice': 'tiếng nói nội tâm',
+    'business leader': 'nhà lãnh đạo doanh nghiệp',
+    'frustrated': 'thất vọng, bực bội',
+    'pitching ideas': 'đưa ra ý tưởng',
+    'detectives': 'thám tử điều tra',
+    'solve the puzzle': 'giải quyết câu đố',
+    'barriers': 'rào cản',
+    'frictions': 'trở ngại, ma sát',
+    'incentives': 'động lực thúc đẩy',
   };
 
   const lower = textEn.toLowerCase();
@@ -82,49 +105,115 @@ const extractSampleKeywords = (textEn: string): KeyWordHighlight[] => {
 };
 
 /**
- * Xử lý & Dịch thuật mảng phụ đề theo từng Chunk (Batching) để tránh Rate Limit
+ * Dịch từng chunk văn bản tiếng Anh sang tiếng Việt với cơ chế retry và đảm bảo số lượng 1-1
+ */
+async function translateChunkWithRetry(
+  texts: string[],
+  retries = 2
+): Promise<string[]> {
+  if (texts.length === 0) return [];
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // Gọi thư viện google-translate-api-x cho cả mảng chuỗi
+      const res = await translate(texts, { to: 'vi' });
+
+      let chunkTranslations: string[] = [];
+      if (Array.isArray(res)) {
+        chunkTranslations = res.map((r: any) => (r && typeof r.text === 'string' ? r.text : ''));
+      } else if (res && typeof res.text === 'string') {
+        chunkTranslations = [res.text];
+      }
+
+      // Đảm bảo số lượng phần tử trả về khớp chính xác số câu đầu vào
+      if (chunkTranslations.length === texts.length) {
+        return chunkTranslations;
+      }
+
+      // Nếu API trả về lệch số phần tử (do xuống dòng hoặc gom câu), căn chỉnh lại 1-1
+      const normalized: string[] = texts.map((orig, idx) => {
+        return chunkTranslations[idx] && typeof chunkTranslations[idx] === 'string'
+          ? chunkTranslations[idx]
+          : orig;
+      });
+
+      return normalized;
+    } catch (err: any) {
+      console.warn(`[translatorService] Thử lại chunk dịch (lần ${attempt}/${retries}): ${err.message}`);
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
+    }
+  }
+
+  // Fallback an toàn nếu cả các lần thử lại đều lỗi: Trả về văn bản gốc, không làm mất câu
+  return texts.map((t) => t);
+}
+
+/**
+ * Xử lý & Dịch thuật toàn bộ mảng phụ đề bằng thuật toán Chunking Array (Batching)
+ * Đảm bảo 100%: Mảng trả về có số lượng phần tử bằng chính xác số lượng câu gốc lấy từ YouTube!
  */
 export const processAndTranslateCaptions = async (
   captions: RawYoutubeCaption[]
 ): Promise<FormattedSubtitle[]> => {
-  // 1. Làm sạch văn bản phụ đề
-  const cleanedList = captions.map((cap) => ({
-    start: parseFloat(cap.start) || 0,
-    dur: parseFloat(cap.dur) || 0,
-    text: cleanSubtitleText(cap.text),
-  })).filter((cap) => cap.text.length > 0);
-
-  if (cleanedList.length === 0) {
+  if (!captions || captions.length === 0) {
     return [];
   }
 
-  const englishTexts = cleanedList.map((c) => c.text);
-  const CHUNK_SIZE = 35; // Chia lô 35 câu/request để giữ an toàn tuyệt đối trước rate limit
-  const translatedTexts: string[] = [];
+  // 1. Làm sạch văn bản từng câu nhưng giữ NGUYÊN VẸN toàn bộ số lượng câu (không filter bỏ phần tử)
+  const cleanedCaptions = captions.map((cap, index) => {
+    const rawText = cleanSubtitleText(cap.text);
+    return {
+      index,
+      start: parseFloat(cap.start) || 0,
+      dur: parseFloat(cap.dur) || 0,
+      text: rawText.length > 0 ? rawText : '[Music]', // Giữ nguyên phần tử dù là nhạc hoặc tiếng vỗ tay
+    };
+  });
 
-  for (let i = 0; i < englishTexts.length; i += CHUNK_SIZE) {
-    const chunk = englishTexts.slice(i, i + CHUNK_SIZE);
+  const TOTAL_COUNT = cleanedCaptions.length;
+  const CHUNK_SIZE = 35; // Tối ưu: 35 câu/chunk (an toàn tuyệt đối dưới ngưỡng giới hạn ký tự / rate limit)
 
-    try {
-      // Gọi thư viện Google Translate
-      const res = await translate(chunk, { to: 'vi' });
-      const chunkTranslations = Array.isArray(res)
-        ? res.map((r: any) => r.text)
-        : [res.text];
+  console.log(`[translatorService] Bắt đầu dịch ${TOTAL_COUNT} câu phụ đề (chia thành các chunk ${CHUNK_SIZE} câu)...`);
 
-      translatedTexts.push(...chunkTranslations);
-    } catch (err) {
-      console.warn(`[translatorService] Warning: Không thể dịch batch từ ${i} đến ${i + CHUNK_SIZE}. Dùng fallback.`);
-      // Nếu API dịch bị nghẽn mạng, gán bản dịch tạm thời để luồng không bị gãy
-      chunk.forEach((t) => translatedTexts.push(`[Dịch tự động]: ${t}`));
+  // 2. Cắt mảng cleanedCaptions thành các mảng con (Chunks)
+  const captionChunks = chunkArray(cleanedCaptions, CHUNK_SIZE);
+  const translatedChunks: string[][] = [];
+
+  // 3. Sử dụng vòng lặp for...of tuần tự kèm delay nhẹ để tránh kích hoạt Rate Limit của API
+  for (let i = 0; i < captionChunks.length; i++) {
+    const currentChunk = captionChunks[i];
+    const englishTexts = currentChunk.map((item) => item.text);
+
+    const chunkTranslated = await translateChunkWithRetry(englishTexts);
+    translatedChunks.push(chunkTranslated);
+
+    // Delay nhẹ 80ms giữa các chunk nếu có nhiều hơn 1 chunk
+    if (captionChunks.length > 1 && i < captionChunks.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
   }
 
-  // 2. Định dạng lại theo chuẩn dữ liệu song ngữ cho Frontend
-  const formattedSubtitles: FormattedSubtitle[] = cleanedList.map((cap, index) => {
+  // 4. Gộp (Flatten) tất cả các chunk thành một mảng duy nhất
+  const flattenedTranslations: string[] = translatedChunks.flat();
+
+  // Đảm bảo tuyệt đối: Số lượng bản dịch phải khớp chính xác với số câu gốc
+  const finalTranslations: string[] = cleanedCaptions.map((item, idx) => {
+    return flattenedTranslations[idx] && typeof flattenedTranslations[idx] === 'string'
+      ? flattenedTranslations[idx]
+      : item.text;
+  });
+
+  console.log(
+    `[translatorService] Hoàn tất dịch: ${finalTranslations.length}/${TOTAL_COUNT} câu phụ đề song ngữ.`
+  );
+
+  // 5. Map vào định dạng chuẩn FormattedSubtitle với startTime, duration, start, end
+  const formattedSubtitles: FormattedSubtitle[] = cleanedCaptions.map((cap, index) => {
     const startSec = Math.round(cap.start * 100) / 100;
     const endSec = Math.round((cap.start + cap.dur) * 100) / 100;
-    const translated = translatedTexts[index] || '';
+    const viText = finalTranslations[index] || cap.text;
 
     return {
       id: `sub_${index + 1}`,
@@ -133,9 +222,9 @@ export const processAndTranslateCaptions = async (
       startTime: Math.round(startSec * 1000),
       duration: Math.round(cap.dur * 1000),
       textEn: cap.text,
-      textVi: translated,
+      textVi: viText,
       english: cap.text,
-      vietnamese: translated,
+      vietnamese: viText,
       keyWords: extractSampleKeywords(cap.text),
     };
   });
