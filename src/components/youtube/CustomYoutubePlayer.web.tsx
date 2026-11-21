@@ -15,6 +15,13 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
 export interface CustomYoutubePlayerRef {
   seekTo: (seconds: number) => void;
   getCurrentTime?: () => Promise<number>;
@@ -23,7 +30,7 @@ export interface CustomYoutubePlayerRef {
 interface CustomYoutubePlayerProps {
   videoId: string;
   isPlaying: boolean;
-  playbackRate: number; // 0.5, 0.75, 1.0
+  playbackRate: number; // 0.5, 0.75, 1.0, 1.25
   onTogglePlayPause: () => void;
   onTimeUpdate: (currentTimeSec: number) => void;
 }
@@ -33,89 +40,159 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
     { videoId, isPlaying, playbackRate, onTogglePlayPause, onTimeUpdate },
     ref
   ) => {
-    const iframeRef = useRef<any>(null);
-    const [showPlayOverlay, setShowPlayOverlay] = useState(false);
-    const currentTimeRef = useRef<number>(0);
-
-    // Gửi lệnh YouTube IFrame API qua postMessage
-    const sendCommand = (func: string, args: any[] = []) => {
-      try {
-        if (iframeRef.current && iframeRef.current.contentWindow) {
-          iframeRef.current.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func, args }),
-            '*'
-          );
-        }
-      } catch (e) {
-        // Bỏ qua lỗi cross-origin
-      }
-    };
+    const containerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 9)}`).current;
+    const playerInstanceRef = useRef<any>(null);
+    const [isApiReady, setIsApiReady] = useState<boolean>(false);
+    const [showPlayOverlay, setShowPlayOverlay] = useState<boolean>(false);
 
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
-        currentTimeRef.current = seconds;
-        onTimeUpdate(seconds);
-        sendCommand('seekTo', [seconds, true]);
+        try {
+          if (playerInstanceRef.current && typeof playerInstanceRef.current.seekTo === 'function') {
+            playerInstanceRef.current.seekTo(seconds, true);
+            onTimeUpdate(seconds);
+          }
+        } catch (e) {
+          console.warn('[CustomYoutubePlayer] Lỗi seekTo:', e);
+        }
       },
       getCurrentTime: async () => {
-        return currentTimeRef.current;
+        try {
+          if (playerInstanceRef.current && typeof playerInstanceRef.current.getCurrentTime === 'function') {
+            return playerInstanceRef.current.getCurrentTime() || 0;
+          }
+        } catch {}
+        return 0;
       },
     }));
 
-    // Nhận sự kiện thời gian thực từ YouTube Iframe API qua postMessage
+    // 1. Tải YouTube IFrame Player API Script nếu chưa có trên Web
     useEffect(() => {
-      const handleWindowMessage = (event: MessageEvent) => {
-        try {
-          if (typeof event.data === 'string') {
-            const data = JSON.parse(event.data);
-            if (
-              data.event === 'infoDelivery' &&
-              data.info &&
-              typeof data.info.currentTime === 'number'
-            ) {
-              currentTimeRef.current = data.info.currentTime;
-              onTimeUpdate(data.info.currentTime);
-            }
-          }
-        } catch {}
-      };
+      if (typeof window === 'undefined') return;
 
-      if (typeof window !== 'undefined') {
-        window.addEventListener('message', handleWindowMessage);
+      if (!window.YT) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
+
+        const prevCallback = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+          if (prevCallback) prevCallback();
+          setIsApiReady(true);
+        };
+      } else if (window.YT && window.YT.Player) {
+        setIsApiReady(true);
+      } else {
+        const interval = setInterval(() => {
+          if (window.YT && window.YT.Player) {
+            setIsApiReady(true);
+            clearInterval(interval);
+          }
+        }, 100);
+        return () => clearInterval(interval);
+      }
+    }, []);
+
+    // 2. Khởi tạo YT.Player khi API sẵn sàng
+    useEffect(() => {
+      if (!isApiReady || typeof window === 'undefined') return;
+
+      try {
+        if (playerInstanceRef.current) {
+          playerInstanceRef.current.destroy();
+        }
+
+        playerInstanceRef.current = new window.YT.Player(containerId, {
+          videoId: videoId,
+          height: '220',
+          width: '100%',
+          playerVars: {
+            autoplay: 1,
+            controls: 0,        // Ẩn thanh điều khiển gốc
+            rel: 0,             // Không hiện video liên quan
+            modestbranding: 1,  // Ẩn logo YouTube
+            iv_load_policy: 3,  // Ẩn chú thích và pop-up
+            playsinline: 1,
+            enablejsapi: 1,
+            disablekb: 1,       // Vô hiệu hóa phím tắt của YouTube
+            fs: 0,              // Tắt nút toàn màn hình mặc định
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (event: any) => {
+              try {
+                event.target.setPlaybackRate(playbackRate);
+                if (isPlaying) {
+                  event.target.playVideo();
+                } else {
+                  event.target.pauseVideo();
+                }
+              } catch {}
+            },
+            onStateChange: (event: any) => {
+              // 1: PLAYING, 2: PAUSED
+              if (event.data === 1 && !isPlaying) {
+                // đồng bộ khi player tự động phát
+              }
+            },
+          },
+        });
+      } catch (err) {
+        console.warn('[CustomYoutubePlayer] Không thể tạo YT.Player:', err);
       }
 
       return () => {
-        if (typeof window !== 'undefined') {
-          window.removeEventListener('message', handleWindowMessage);
-        }
+        try {
+          if (playerInstanceRef.current && typeof playerInstanceRef.current.destroy === 'function') {
+            playerInstanceRef.current.destroy();
+          }
+        } catch {}
       };
-    }, [onTimeUpdate]);
+    }, [isApiReady, videoId]);
 
-    // Cập nhật trạng thái Play/Pause trên Web
+    // 3. Đồng bộ Play / Pause thực tế
     useEffect(() => {
-      if (isPlaying) {
-        sendCommand('playVideo');
-      } else {
-        sendCommand('pauseVideo');
-      }
+      const p = playerInstanceRef.current;
+      if (!p) return;
+
+      try {
+        if (isPlaying && typeof p.playVideo === 'function') {
+          p.playVideo();
+        } else if (!isPlaying && typeof p.pauseVideo === 'function') {
+          p.pauseVideo();
+        }
+      } catch {}
     }, [isPlaying]);
 
-    // Cập nhật tốc độ phát trên Web
+    // 4. Đồng bộ Tốc độ phát thực tế
     useEffect(() => {
-      sendCommand('setPlaybackRate', [playbackRate]);
+      const p = playerInstanceRef.current;
+      if (!p) return;
+
+      try {
+        if (typeof p.setPlaybackRate === 'function') {
+          p.setPlaybackRate(playbackRate);
+        }
+      } catch {}
     }, [playbackRate]);
 
-    // Vòng lặp cập nhật thời gian phát liên tục cho Web (200ms/lần)
+    // 5. VÒNG LẶP ĐỒNG BỘ THỜI GIAN CHÍNH XÁC 100% TỪ YOUTUBE PLAYER
     useEffect(() => {
-      if (!isPlaying) return;
-
       const interval = setInterval(() => {
-        currentTimeRef.current += 0.2 * playbackRate;
-        onTimeUpdate(currentTimeRef.current);
+        const p = playerInstanceRef.current;
+        if (p && typeof p.getCurrentTime === 'function') {
+          try {
+            const realTime = p.getCurrentTime();
+            if (typeof realTime === 'number' && !isNaN(realTime)) {
+              onTimeUpdate(realTime);
+            }
+          } catch {}
+        }
       }, 200);
 
       return () => clearInterval(interval);
-    }, [isPlaying, playbackRate, onTimeUpdate]);
+    }, [onTimeUpdate]);
 
     const handleTapScreen = () => {
       onTogglePlayPause();
@@ -123,17 +200,12 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       setTimeout(() => setShowPlayOverlay(false), 700);
     };
 
-    // Embed URL chuẩn YouTube No-Cookie: Ẩn controls, ẩn đề xuất, ẩn logo
-    const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1`;
-
     return (
       <View style={styles.container}>
-        {/* Khung IFrame Web chặn hoàn toàn thao tác click vào video gốc */}
+        {/* Khung chứa Iframe được bọc pointerEvents="none" chặn hoàn toàn click ngoài */}
         <View style={styles.videoWrapper} pointerEvents="none">
-          <iframe
-            ref={iframeRef}
-            src={embedUrl}
-            title="Clean YouTube Player"
+          <div
+            id={containerId}
             style={{
               width: '100%',
               height: '100%',
@@ -141,8 +213,6 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
               backgroundColor: '#000000',
               pointerEvents: 'none',
             }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen={false}
           />
         </View>
 

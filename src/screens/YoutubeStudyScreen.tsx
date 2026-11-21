@@ -45,11 +45,16 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
 
   const playbackRate = SPEED_OPTIONS[playbackRateIndex];
 
-  // Tìm câu phụ đề hiện tại dựa trên mốc thời gian video
+  // Tìm câu phụ đề hiện tại dựa trên mốc thời gian video:
+  // 1. Khớp chính xác câu đang phát trong khoảng start -> end
+  // 2. Nếu rơi vào khoảng lặng tự nhiên (pause giữa 2 câu), giữ câu vừa phát gần nhất
+  // 3. Nếu ở đầu video, lấy câu đầu tiên
   const activeSubtitle =
     video.subtitles.find(
       (sub) => currentTimeSec >= sub.start && currentTimeSec <= sub.end
-    ) || (video.subtitles.length > 0 ? video.subtitles[0] : null);
+    ) ||
+    [...video.subtitles].reverse().find((sub) => currentTimeSec >= sub.start) ||
+    (video.subtitles.length > 0 ? video.subtitles[0] : null);
 
   // Xử lý logic lặp lại câu (A-B Looping)
   useEffect(() => {
