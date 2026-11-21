@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { YoutubeVideoItem, YoutubeSubtitleSegment } from '../types/youtube';
 import { MOCK_YOUTUBE_LIBRARY } from '../data/mockYoutubeLibrary';
+import { MOCK_LEVEL_LIBRARY } from '../data/mockLevelLibrary';
 import { YoutubeURLInput } from '../components/youtube/YoutubeURLInput';
 import { LevelVideoFeed } from '../components/youtube/LevelVideoFeed';
 import { SavedVideosSection } from '../components/youtube/SavedVideosSection';
@@ -178,10 +179,15 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
     );
   }
 
-  // Kết hợp video đã lưu của người dùng và video thư viện mẫu (không trùng ID)
-  const allVideos = [
+  // Kết hợp video đã lưu của người dùng và 60 video thư viện mặc định chuẩn CEFR (A1 - C2)
+  const allVideos: YoutubeVideoItem[] = [
     ...savedVideos,
-    ...MOCK_YOUTUBE_LIBRARY.filter((mv) => !savedVideos.some((sv) => sv.id === mv.id)),
+    ...MOCK_LEVEL_LIBRARY.filter((lv) => !savedVideos.some((sv) => sv.id === lv.id)),
+    ...MOCK_YOUTUBE_LIBRARY.filter(
+      (mv) =>
+        !savedVideos.some((sv) => sv.id === mv.id) &&
+        !MOCK_LEVEL_LIBRARY.some((lv) => lv.id === mv.id)
+    ),
   ];
 
   return (
