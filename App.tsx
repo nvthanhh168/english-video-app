@@ -94,10 +94,13 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    height: '100%',
+    minHeight: '100vh' as any,
     backgroundColor: '#000000',
   },
   content: {
     flex: 1,
+    height: '100%',
   },
   moduleSwitcherContainer: {
     backgroundColor: 'rgba(10, 15, 29, 0.95)',
