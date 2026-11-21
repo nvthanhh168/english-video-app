@@ -1,0 +1,24 @@
+node_modules/
+.expo/
+dist/
+web-build/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Native artifacts
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Env files
+.env
+.env.local
+.env*.local
+
+# System files
+.DS_Store
+Thumbs.db
