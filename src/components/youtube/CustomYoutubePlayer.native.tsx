@@ -49,22 +49,32 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       },
     }));
 
-    // Vòng lặp cập nhật thời gian phát hiện tại từ Iframe (200ms/lần)
+    // Vòng lặp cập nhật thời gian phát hiện tại từ Iframe (200ms/lần = 0.2s)
+    // Ngăn chặn nghẽn bridge hoặc race conditions khi getCurrentTime() phản hồi chậm
     useEffect(() => {
+      let isMounted = true;
+      let isQuerying = false;
+
       const interval = setInterval(async () => {
-        if (playerRef.current && isPlaying) {
-          try {
-            const currentTime = await playerRef.current.getCurrentTime();
-            if (typeof currentTime === 'number') {
-              onTimeUpdate(currentTime);
-            }
-          } catch {
-            // Bỏ qua lỗi ngầm khi iframe chưa sẵn sàng
+        if (!playerRef.current || !isPlaying || isQuerying) return;
+
+        isQuerying = true;
+        try {
+          const currentTime = await playerRef.current.getCurrentTime();
+          if (isMounted && typeof currentTime === 'number' && !isNaN(currentTime)) {
+            onTimeUpdate(currentTime);
           }
+        } catch {
+          // Bỏ qua lỗi ngầm khi iframe chưa sẵn sàng hoặc đang delay
+        } finally {
+          isQuerying = false;
         }
       }, 200);
 
-      return () => clearInterval(interval);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }, [isPlaying, onTimeUpdate]);
 
     // Đồng bộ tốc độ phát video
@@ -103,7 +113,7 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
               rel: false,      // Không hiện video đề xuất
               modestbranding: true,
               iv_load_policy: 3, // Ẩn chú thích và banner pop-up
-            }}
+            } as any}
           />
         </View>
 

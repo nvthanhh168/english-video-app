@@ -12,14 +12,14 @@ export interface YoutubeApiSubtitle {
 export interface UseYoutubeSyncOptions {
   initialSubtitles?: YoutubeApiSubtitle[];
   backendUrl?: string; // Mặc định 'http://localhost:5001'
-  pollIntervalMs?: number; // Mặc định 250ms
+  pollIntervalMs?: number; // Mặc định 200ms (0.2 giây)
 }
 
 export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
   const {
     initialSubtitles = [],
     backendUrl = 'http://localhost:5001',
-    pollIntervalMs = 250,
+    pollIntervalMs = 200, // Tần suất quét 200ms (0.2s) theo Yêu cầu 2
   } = options;
 
   const playerRef = useRef<any>(null);
@@ -37,23 +37,42 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
-  // Đồng bộ thời gian thực: Polling getCurrentTime() từ YouTube Iframe
+  // Đồng bộ thời gian thực: Polling getCurrentTime() từ YouTube Iframe (200ms / 0.2s)
   useEffect(() => {
-    const timer = setInterval(async () => {
-      if (!playerRef.current || !isPlaying) return;
+    let isMounted = true;
+    let isQuerying = false;
 
+    const timer = setInterval(async () => {
+      if (!playerRef.current || !isPlaying || isQuerying) return;
+
+      isQuerying = true;
       try {
         const timeSec = await playerRef.current.getCurrentTime();
-        if (typeof timeSec === 'number' && !isNaN(timeSec)) {
+        if (isMounted && typeof timeSec === 'number' && !isNaN(timeSec)) {
           const currentMs = Math.round(timeSec * 1000);
           setCurrentTimeMs(currentMs);
 
-          // Tìm câu phụ đề khớp với thời điểm hiện tại
-          const matched = subtitles.find(
-            (sub) =>
-              currentMs >= sub.startTime &&
-              currentMs < sub.startTime + sub.duration
-          );
+          // LOGIC SO KHỚP KHOẢNG THỜI GIAN (SUBTITLE SYNC):
+          // Thay vì tìm chính xác (===), dùng hàm find để tìm câu phụ đề mà
+          // currentTime nằm giữa startTime và endTime (với endTime = startTime + duration).
+          const matched = subtitles.find((sub) => {
+            const startTime =
+              typeof sub.startTime === 'number'
+                ? sub.startTime
+                : typeof (sub as any).start === 'number'
+                ? Math.round((sub as any).start * 1000)
+                : 0;
+
+            const duration =
+              typeof sub.duration === 'number'
+                ? (sub.duration < 200 ? Math.round(sub.duration * 1000) : sub.duration)
+                : typeof (sub as any).end === 'number'
+                ? Math.round((sub as any).end * 1000) - startTime
+                : 0;
+
+            const endTime = startTime + duration;
+            return currentMs >= startTime && currentMs < endTime;
+          });
 
           if (matched && matched.id !== activeSubtitle?.id) {
             setActiveSubtitle(matched);
@@ -61,18 +80,32 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
 
           // Xử lý Lặp câu (A-B Sentence Looping)
           if (isLoopingSentence && activeSubtitle) {
-            const endMs = activeSubtitle.startTime + activeSubtitle.duration;
+            const startMs =
+              typeof activeSubtitle.startTime === 'number'
+                ? activeSubtitle.startTime
+                : Math.round(((activeSubtitle as any).start || 0) * 1000);
+            const durationMs =
+              typeof activeSubtitle.duration === 'number'
+                ? (activeSubtitle.duration < 200 ? Math.round(activeSubtitle.duration * 1000) : activeSubtitle.duration)
+                : Math.round((((activeSubtitle as any).end || 0) - ((activeSubtitle as any).start || 0)) * 1000);
+            const endMs = startMs + durationMs;
+
             if (currentMs >= endMs) {
-              playerRef.current.seekTo?.(activeSubtitle.startTime / 1000, true);
+              playerRef.current.seekTo?.(startMs / 1000, true);
             }
           }
         }
       } catch {
         // Iframe có thể chưa sẵn sàng ở frame đầu tiên
+      } finally {
+        isQuerying = false;
       }
     }, pollIntervalMs);
 
-    return () => clearInterval(timer);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
   }, [isPlaying, subtitles, activeSubtitle, isLoopingSentence, pollIntervalMs]);
 
   // Điều khiển Play / Pause

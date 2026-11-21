@@ -59,22 +59,60 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
 
   const playbackRate = SPEED_OPTIONS[playbackRateIndex];
 
-  // Tìm câu phụ đề hiện tại dựa trên mốc thời gian video:
-  // 1. Khớp chính xác câu đang phát trong khoảng start -> end
-  // 2. Nếu rơi vào khoảng lặng tự nhiên (pause giữa 2 câu), giữ câu vừa phát gần nhất
-  // 3. Nếu ở đầu video, lấy câu đầu tiên
+  // LOGIC SO KHỚP KHOẢNG THỜI GIAN (SUBTITLE SYNC):
+  // Thay vì tìm chính xác (===), sử dụng hàm find để tìm câu phụ đề mà
+  // currentTimeSec nằm giữa startTime và endTime (với endTime = startTime + duration).
+  // Đồng thời có fallback giữ câu vừa phát gần nhất trong khoảng lặng tự nhiên giữa 2 câu.
   const activeSubtitle =
-    subtitles.find(
-      (sub) => currentTimeSec >= sub.start && currentTimeSec <= sub.end
-    ) ||
-    [...subtitles].reverse().find((sub) => currentTimeSec >= sub.start) ||
+    subtitles.find((sub) => {
+      const startTime =
+        typeof sub.start === 'number'
+          ? sub.start
+          : typeof (sub as any).startTime === 'number'
+          ? (sub as any).startTime / 1000
+          : 0;
+
+      const duration =
+        typeof (sub as any).duration === 'number'
+          ? ((sub as any).duration > 500 ? (sub as any).duration / 1000 : (sub as any).duration)
+          : typeof sub.end === 'number'
+          ? sub.end - startTime
+          : 0;
+
+      const endTime = startTime + duration;
+      return currentTimeSec >= startTime && currentTimeSec < endTime;
+    }) ||
+    [...subtitles].reverse().find((sub) => {
+      const startTime =
+        typeof sub.start === 'number'
+          ? sub.start
+          : typeof (sub as any).startTime === 'number'
+          ? (sub as any).startTime / 1000
+          : 0;
+      return currentTimeSec >= startTime;
+    }) ||
     (subtitles.length > 0 ? subtitles[0] : null);
 
   // Xử lý logic lặp lại câu (A-B Looping)
   useEffect(() => {
     if (isLoopingSentence && activeSubtitle) {
-      if (currentTimeSec >= activeSubtitle.end) {
-        playerRef.current?.seekTo(activeSubtitle.start);
+      const startTime =
+        typeof activeSubtitle.start === 'number'
+          ? activeSubtitle.start
+          : typeof (activeSubtitle as any).startTime === 'number'
+          ? (activeSubtitle as any).startTime / 1000
+          : 0;
+
+      const duration =
+        typeof (activeSubtitle as any).duration === 'number'
+          ? ((activeSubtitle as any).duration > 500 ? (activeSubtitle as any).duration / 1000 : (activeSubtitle as any).duration)
+          : typeof activeSubtitle.end === 'number'
+          ? activeSubtitle.end - startTime
+          : 0;
+
+      const endTime = startTime + duration;
+      if (currentTimeSec >= endTime) {
+        playerRef.current?.seekTo(startTime);
       }
     }
   }, [currentTimeSec, isLoopingSentence, activeSubtitle]);
