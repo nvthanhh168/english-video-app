@@ -366,25 +366,25 @@ export const MOCK_YOUTUBE_LIBRARY: YoutubeVideoItem[] = [
   },
 
   // =====================================================================
-  // CẤP ĐỘ A1 - ENGLISH SINGSING (ĐẦY ĐỦ THÓI QUEN HÀNG NGÀY)
+  // CẤP ĐỘ A1 - BOB THE CANADIAN (THÓI QUEN HÀNG NGÀY & TỪ VỰNG DỄ)
   // =====================================================================
   {
-    id: 'qD1pnquN_DM',
-    title: 'Daily Routines and Easy Vocabulary for Beginners',
-    channelTitle: 'English Singsing',
-    thumbnailUrl: 'https://img.youtube.com/vi/qD1pnquN_DM/hqdefault.jpg',
-    duration: '3:20',
-    durationSec: 200,
+    id: 'ecF1y2bI2T4',
+    title: 'Learn How To Talk About Your Daily Routine in English',
+    channelTitle: 'Learn English with Bob the Canadian',
+    thumbnailUrl: 'https://i.ytimg.com/vi/ecF1y2bI2T4/hqdefault.jpg',
+    duration: '6:42',
+    durationSec: 402,
     level: 'A1',
-    views: '2.1M',
+    views: '1.2M',
     subtitles: [
       {
         id: 'a1_daily_1',
         start: 0,
         end: 4.5,
-        textEn: "Kids vocabulary - My Day - Daily Routine.",
-        textVi: 'Từ vựng cho bé - Một ngày của tôi - Thói quen hàng ngày.',
-        keyWords: [{ word: 'Daily Routine', meaningVi: 'Thói quen hàng ngày' }]
+        textEn: "In this English lesson, we will talk about your daily routine.",
+        textVi: 'Trong bài học tiếng Anh này, chúng ta sẽ nói về thói quen hàng ngày của bạn.',
+        keyWords: [{ word: 'daily routine', meaningVi: 'thói quen hàng ngày' }]
       },
       {
         id: 'a1_daily_2',

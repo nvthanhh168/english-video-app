@@ -191,7 +191,12 @@ export const LevelVideoFeed: React.FC<LevelVideoFeedProps> = ({
               {/* Thumbnail với Badge thời lượng và Level/History */}
               <View style={styles.thumbnailWrapper}>
                 <Image
-                  source={{ uri: item.thumbnailUrl }}
+                  source={{
+                    uri:
+                      item.thumbnailUrl ||
+                      (item as any).thumbnail ||
+                      `https://i.ytimg.com/vi/${item.id || (item as any).videoId}/hqdefault.jpg`,
+                  }}
                   style={styles.thumbnail}
                   resizeMode="cover"
                 />
