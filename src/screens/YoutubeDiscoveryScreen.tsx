@@ -18,6 +18,7 @@ import { YoutubeStudyScreen } from './YoutubeStudyScreen';
 import {
   extractVideoId,
   extractAndTranslateYoutubeSubtitles,
+  fetchYoutubeVideoMeta,
 } from '../services/youtubeExtractor';
 
 export const YoutubeDiscoveryScreen: React.FC = () => {
@@ -50,17 +51,20 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
         return;
       }
 
-      // Gọi API Backend Node.js (POST /api/youtube/import)
-      const extractedSubtitles = await extractAndTranslateYoutubeSubtitles(videoId);
+      // 2. Lấy thông tin thật từ YouTube qua oEmbed (Tiêu đề thật, Kênh thật, Thumbnail)
+      const meta = await fetchYoutubeVideoMeta(videoId);
+
+      // 3. Trích xuất phụ đề (từ backend hoặc thư viện AI)
+      const extractedSubtitles = await extractAndTranslateYoutubeSubtitles(videoId, meta.title);
 
       const customVideoItem: YoutubeVideoItem = {
         id: videoId,
-        title: `YouTube Video (${videoId})`,
-        channelTitle: 'YouTube Creator',
-        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        duration: '5:00',
-        durationSec: 300,
-        level: 'B1',
+        title: meta.title,
+        channelTitle: meta.author,
+        thumbnailUrl: meta.thumbnailUrl,
+        duration: '10:00',
+        durationSec: 600,
+        level: 'B2',
         views: '100K+',
         subtitles: extractedSubtitles,
       };

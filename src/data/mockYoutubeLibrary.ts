@@ -614,6 +614,186 @@ export const MOCK_YOUTUBE_LIBRARY: YoutubeVideoItem[] = [
   },
 
   // =====================================================================
+  // CẤP ĐỘ B2 - PHILIP JAMESON: WANT SOMEONE TO CHANGE? (TED TALK)
+  // =====================================================================
+  {
+    id: 'VgOm8nqPlD4',
+    title: 'Want Someone to Change? Ask This Question | Philip Jameson | TED',
+    channelTitle: 'Philip Jameson • TED',
+    thumbnailUrl: 'https://img.youtube.com/vi/VgOm8nqPlD4/hqdefault.jpg',
+    duration: '10:25',
+    durationSec: 625,
+    level: 'B2',
+    views: '1.8M',
+    subtitles: [
+      {
+        id: 'pj_1',
+        start: 0,
+        end: 6.0,
+        textEn: 'A few years ago, I was speaking with a business leader who was frustrated.',
+        textVi: 'Vài năm trước, tôi có nói chuyện với một nhà lãnh đạo doanh nghiệp đang rất thất vọng.',
+        keyWords: [
+          { word: 'business leader', meaningVi: 'nhà lãnh đạo doanh nghiệp', highlightColor: '#22C55E' },
+          { word: 'frustrated', meaningVi: 'thất vọng, bực bội', highlightColor: '#EF4444' }
+        ]
+      },
+      {
+        id: 'pj_2',
+        start: 6.0,
+        end: 13.0,
+        textEn: 'He was always pitching new ideas to his team on how they could work together better and faster.',
+        textVi: 'Ông ấy luôn đưa ra những ý tưởng mới cho nhóm của mình về cách họ có thể phối hợp làm việc tốt hơn và nhanh hơn.',
+        keyWords: [
+          { word: 'pitching new ideas', meaningVi: 'đưa ra ý tưởng mới', highlightColor: '#38BDF8' },
+          { word: 'work together', meaningVi: 'hợp tác, làm việc cùng nhau' }
+        ]
+      },
+      {
+        id: 'pj_3',
+        start: 13.0,
+        end: 19.5,
+        textEn: "But his team didn't seem to take up those ideas very often.",
+        textVi: 'Thế nhưng nhóm của ông ấy dường như chẳng mấy khi đón nhận những ý tưởng đó.',
+        keyWords: [
+          { word: 'take up ideas', meaningVi: 'đón nhận / tiếp thu ý tưởng', highlightColor: '#22C55E' },
+          { word: "didn't seem", meaningVi: 'dường như không' }
+        ]
+      },
+      {
+        id: 'pj_4',
+        start: 19.5,
+        end: 26.5,
+        textEn: "At the end of our conversation, he said something that stayed with me: 'I don't understand why they won't just change.'",
+        textVi: 'Vào cuối cuộc trò chuyện, ông ấy nói một câu khiến tôi nhớ mãi: "Tôi không hiểu tại sao họ lại không chịu thay đổi."',
+        keyWords: [
+          { word: 'stayed with me', meaningVi: 'khiến tôi nhớ mãi', highlightColor: '#38BDF8' },
+          { word: "won't change", meaningVi: 'không chịu thay đổi' }
+        ]
+      },
+      {
+        id: 'pj_5',
+        start: 26.5,
+        end: 34.0,
+        textEn: "Why wouldn't people want to work smarter? Why wouldn't they want to make things easier for themselves?",
+        textVi: 'Tại sao mọi người lại không muốn làm việc thông minh hơn? Tại sao họ lại không muốn làm cho mọi việc dễ dàng hơn cho chính mình?',
+        keyWords: [
+          { word: 'work smarter', meaningVi: 'làm việc thông minh hơn', highlightColor: '#22C55E' },
+          { word: 'easier', meaningVi: 'dễ dàng hơn' }
+        ]
+      },
+      {
+        id: 'pj_6',
+        start: 34.0,
+        end: 42.0,
+        textEn: "Notice that question: 'Why wouldn't they do it?' It sounds completely innocent, but it is a trap.",
+        textVi: 'Hãy chú ý đến câu hỏi đó: "Tại sao họ lại không làm điều đó?" Nó nghe có vẻ hoàn toàn vô hại, nhưng thực chất là một cái bẫy.',
+        keyWords: [
+          { word: 'innocent', meaningVi: 'vô hại, ngây thơ' },
+          { word: 'a trap', meaningVi: 'một cái bẫy', highlightColor: '#EF4444' }
+        ]
+      },
+      {
+        id: 'pj_7',
+        start: 42.0,
+        end: 50.0,
+        textEn: "When we ask 'Why wouldn't they do it?', our brains immediately jump to judgment.",
+        textVi: 'Khi chúng ta hỏi "Tại sao họ lại không làm?", bộ não của chúng ta lập tức chuyển sang chế độ phán xét.',
+        keyWords: [
+          { word: 'jump to judgment', meaningVi: 'vội vàng phán xét', highlightColor: '#EF4444' }
+        ]
+      },
+      {
+        id: 'pj_8',
+        start: 50.0,
+        end: 58.0,
+        textEn: 'We assume people are lazy, or stubborn, or resistant to change.',
+        textVi: 'Chúng ta vội cho rằng mọi người lười biếng, bướng bỉnh, hoặc chống đối lại sự thay đổi.',
+        keyWords: [
+          { word: 'stubborn', meaningVi: 'bướng bỉnh, cứng đầu' },
+          { word: 'resistant to change', meaningVi: 'kháng cự sự thay đổi', highlightColor: '#F59E0B' }
+        ]
+      },
+      {
+        id: 'pj_9',
+        start: 58.0,
+        end: 67.0,
+        textEn: "Instead of being judges, we need to become detectives. And detectives ask a slightly different question: 'Why won't they do it?'",
+        textVi: 'Thay vì làm quan tòa phán xét, chúng ta cần trở thành thám tử. Và thám tử thì hỏi một câu hơi khác một chút: "Tại sao họ lại không làm điều đó?"',
+        keyWords: [
+          { word: 'detectives', meaningVi: 'thám tử điều tra', highlightColor: '#38BDF8' },
+          { word: 'slightly different', meaningVi: 'hơi khác một chút' }
+        ]
+      },
+      {
+        id: 'pj_10',
+        start: 67.0,
+        end: 76.0,
+        textEn: 'Changing just that one word transforms resistance from a character flaw into a puzzle to solve.',
+        textVi: 'Chỉ thay đổi đúng một từ đó thôi đã biến sự phản kháng từ một khuyết điểm tính cách thành một câu đố cần tìm lời giải.',
+        keyWords: [
+          { word: 'transforms', meaningVi: 'biến đổi' },
+          { word: 'character flaw', meaningVi: 'khuyết điểm tính cách' },
+          { word: 'puzzle to solve', meaningVi: 'câu đố cần tìm lời giải', highlightColor: '#22C55E' }
+        ]
+      },
+      {
+        id: 'pj_11',
+        start: 76.0,
+        end: 86.0,
+        textEn: 'As detectives, we start investigating the real barriers: What knowledge or skills are they missing?',
+        textVi: 'Khi đóng vai thám tử, chúng ta bắt đầu điều tra những rào cản thực sự: Họ đang thiếu kiến thức hay kỹ năng gì?',
+        keyWords: [
+          { word: 'investigating', meaningVi: 'điều tra' },
+          { word: 'barriers', meaningVi: 'rào cản' }
+        ]
+      },
+      {
+        id: 'pj_12',
+        start: 86.0,
+        end: 96.0,
+        textEn: "Sometimes people want to do it, but they simply don't know how. The fix is simple: provide training and clear instructions.",
+        textVi: 'Đôi khi mọi người rất muốn làm, nhưng đơn giản là họ không biết phải làm thế nào. Giải pháp rất đơn giản: cung cấp đào tạo và hướng dẫn rõ ràng.',
+        keyWords: [
+          { word: 'provide training', meaningVi: 'cung cấp đào tạo', highlightColor: '#22C55E' },
+          { word: 'clear instructions', meaningVi: 'hướng dẫn rõ ràng' }
+        ]
+      },
+      {
+        id: 'pj_13',
+        start: 96.0,
+        end: 106.0,
+        textEn: 'The second question is: What frictions are getting in their way? Is it a lack of time, competing priorities, or broken tools?',
+        textVi: 'Câu hỏi thứ hai là: Những ma sát nào đang cản trở họ? Có phải do thiếu thời gian, xung đột ưu tiên, hay công cụ bị hỏng?',
+        keyWords: [
+          { word: 'frictions', meaningVi: 'ma sát, trở ngại', highlightColor: '#F59E0B' },
+          { word: 'competing priorities', meaningVi: 'các ưu tiên xung đột nhau' }
+        ]
+      },
+      {
+        id: 'pj_14',
+        start: 106.0,
+        end: 116.0,
+        textEn: 'And third: What are the incentives? If people feel they take all the risk for no reward, they will say no.',
+        textVi: 'Và câu hỏi thứ ba: Đâu là động lực thúc đẩy? Nếu mọi người cảm thấy họ gánh mọi rủi ro mà không nhận lại phần thưởng nào, họ sẽ từ chối.',
+        keyWords: [
+          { word: 'incentives', meaningVi: 'động lực, quyền lợi thúc đẩy', highlightColor: '#38BDF8' },
+          { word: 'risk', meaningVi: 'rủi ro' }
+        ]
+      },
+      {
+        id: 'pj_15',
+        start: 116.0,
+        end: 128.0,
+        textEn: "So the next time you want someone to change, don't judge. Become a detective, ask 'Why won't they do it?', and solve the puzzle together.",
+        textVi: 'Vì vậy lần tới khi bạn muốn ai đó thay đổi, đừng vội phán xét. Hãy trở thành thám tử, hỏi "Tại sao họ không làm?", và cùng nhau giải câu đố.',
+        keyWords: [
+          { word: 'solve the puzzle', meaningVi: 'giải câu đố cùng nhau', highlightColor: '#22C55E' }
+        ]
+      }
+    ]
+  },
+
+  // =====================================================================
   // CẤP ĐỘ C1 - VERITASIUM: TỐC ĐỘ ÁNH SÁNG
   // =====================================================================
   {
