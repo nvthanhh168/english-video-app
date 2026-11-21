@@ -62,6 +62,35 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       },
     }));
 
+    // Nhận sự kiện thời gian thực từ YouTube Iframe API qua postMessage
+    useEffect(() => {
+      const handleWindowMessage = (event: MessageEvent) => {
+        try {
+          if (typeof event.data === 'string') {
+            const data = JSON.parse(event.data);
+            if (
+              data.event === 'infoDelivery' &&
+              data.info &&
+              typeof data.info.currentTime === 'number'
+            ) {
+              currentTimeRef.current = data.info.currentTime;
+              onTimeUpdate(data.info.currentTime);
+            }
+          }
+        } catch {}
+      };
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('message', handleWindowMessage);
+      }
+
+      return () => {
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('message', handleWindowMessage);
+        }
+      };
+    }, [onTimeUpdate]);
+
     // Cập nhật trạng thái Play/Pause trên Web
     useEffect(() => {
       if (isPlaying) {
@@ -76,14 +105,14 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       sendCommand('setPlaybackRate', [playbackRate]);
     }, [playbackRate]);
 
-    // Vòng lặp cập nhật thời gian phát mô phỏng mượt mà cho Web (250ms/lần)
+    // Vòng lặp cập nhật thời gian phát liên tục cho Web (200ms/lần)
     useEffect(() => {
       if (!isPlaying) return;
 
       const interval = setInterval(() => {
-        currentTimeRef.current += 0.25 * playbackRate;
+        currentTimeRef.current += 0.2 * playbackRate;
         onTimeUpdate(currentTimeRef.current);
-      }, 250);
+      }, 200);
 
       return () => clearInterval(interval);
     }, [isPlaying, playbackRate, onTimeUpdate]);
