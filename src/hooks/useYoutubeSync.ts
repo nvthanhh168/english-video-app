@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Haptics from 'expo-haptics';
+import { saveImportedVideo } from '../services/importedVideosStorage';
 
 export interface YoutubeApiSubtitle {
   id: string;
@@ -190,6 +191,22 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
               vietnamese: s.vietnamese || s.textVi || '',
             })
           );
+
+          // LƯU VÀO ASYNCSTORAGE (Mảng imported_videos theo YÊU CẦU 3)
+          saveImportedVideo({
+            videoId: json.data.videoId,
+            title: json.data.title || `YouTube Video (${json.data.videoId})`,
+            thumbnail: json.data.thumbnail || `https://img.youtube.com/vi/${json.data.videoId}/hqdefault.jpg`,
+            platform: 'youtube',
+            importedAt: new Date().toISOString(),
+            subtitles: apiSubs.map((s) => ({
+              id: s.id,
+              start: s.startTime / 1000,
+              end: (s.startTime + s.duration) / 1000,
+              textEn: s.english,
+              textVi: s.vietnamese,
+            })),
+          }).catch(() => {});
 
           setSubtitles(apiSubs);
           setIsLoading(false);

@@ -1,18 +1,45 @@
 import { YoutubeVideoItem, YoutubeSubtitleSegment } from '../types/youtube';
+import {
+  saveImportedVideo,
+  getImportedVideos,
+  removeImportedVideo,
+  updateImportedVideoSubtitles,
+  importedToYoutubeVideo,
+  IMPORTED_VIDEOS_STORAGE_KEY,
+  ImportedVideoItem,
+} from './importedVideosStorage';
 
-const STORAGE_KEY = '@english_video_app_saved_videos';
+export {
+  saveImportedVideo,
+  getImportedVideos,
+  removeImportedVideo,
+  updateImportedVideoSubtitles,
+  importedToYoutubeVideo,
+  IMPORTED_VIDEOS_STORAGE_KEY,
+};
+export type { ImportedVideoItem };
+
+const STORAGE_KEY = 'imported_videos';
 
 /**
- * Đọc danh sách video đã lưu từ localStorage (hoặc bộ nhớ web)
+ * Đọc danh sách video đã lưu từ localStorage / AsyncStorage (đồng bộ)
  */
 export function getSavedVideos(): YoutubeVideoItem[] {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      const data = window.localStorage.getItem(STORAGE_KEY);
+      const data =
+        window.localStorage.getItem(STORAGE_KEY) ||
+        window.localStorage.getItem('@english_video_app_saved_videos');
       if (data) {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed)) {
-          return parsed;
+          return parsed.map((item) => {
+            // Tương thích cả định dạng ImportedVideoItem (videoId) và YoutubeVideoItem (id)
+            if (item.videoId && !item.id) {
+              return importedToYoutubeVideo(item);
+            }
+            return item;
+          });
         }
       }
     }
@@ -23,12 +50,11 @@ export function getSavedVideos(): YoutubeVideoItem[] {
 }
 
 /**
- * Lưu một video vào bộ nhớ bền vững (không bị mất khi F5 hoặc mở lại web)
+ * Lưu một video vào bộ nhớ bền vững (AsyncStorage & localStorage)
  */
 export function saveVideoToStorage(video: YoutubeVideoItem): YoutubeVideoItem[] {
   try {
     const current = getSavedVideos();
-    // Đưa video mới lên đầu danh sách, loại bỏ trùng lặp nếu có
     const updated = [
       {
         ...video,
@@ -40,7 +66,24 @@ export function saveVideoToStorage(video: YoutubeVideoItem): YoutubeVideoItem[] 
 
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.localStorage.setItem('@english_video_app_saved_videos', JSON.stringify(updated));
     }
+
+    // Gọi thêm saveImportedVideo vào AsyncStorage
+    saveImportedVideo({
+      videoId: video.id,
+      title: video.title,
+      thumbnail: video.thumbnailUrl,
+      platform: 'youtube',
+      importedAt: new Date().toISOString(),
+      subtitles: video.subtitles,
+      channelTitle: video.channelTitle,
+      duration: video.duration,
+      durationSec: video.durationSec,
+      level: video.level,
+      views: video.views,
+    }).catch(() => {});
+
     return updated;
   } catch (error) {
     console.warn('[savedVideosStorage] Lỗi khi lưu video:', error);
@@ -58,7 +101,11 @@ export function removeSavedVideoFromStorage(videoId: string): YoutubeVideoItem[]
 
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.localStorage.setItem('@english_video_app_saved_videos', JSON.stringify(updated));
     }
+
+    removeImportedVideo(videoId).catch(() => {});
+
     return updated;
   } catch (error) {
     console.warn('[savedVideosStorage] Lỗi khi xóa video:', error);
@@ -87,7 +134,11 @@ export function updateVideoSubtitlesInStorage(
 
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.localStorage.setItem('@english_video_app_saved_videos', JSON.stringify(updated));
     }
+
+    updateImportedVideoSubtitles(videoId, newSubtitles).catch(() => {});
+
     return updated;
   } catch (error) {
     console.warn('[savedVideosStorage] Lỗi khi cập nhật phụ đề:', error);
