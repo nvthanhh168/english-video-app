@@ -60,37 +60,33 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
 
   const playbackRate = SPEED_OPTIONS[playbackRateIndex];
 
-  // LOGIC SO KHỚP KHOẢNG THỜI GIAN (SUBTITLE SYNC):
-  // Thay vì tìm chính xác (===), sử dụng hàm find để tìm câu phụ đề mà
-  // currentTimeSec nằm giữa startTime và endTime (với endTime = startTime + duration).
-  // Đồng thời có fallback giữ câu vừa phát gần nhất trong khoảng lặng tự nhiên giữa 2 câu.
+  // YÊU CẦU 3: ĐỒNG BỘ ĐƠN VỊ THỜI GIAN (SECONDS vs MILLISECONDS)
+  // getCurrentTime() trả về giây (vd: 1.5s), nhân 1000 để đổi ra mili-giây trước khi so sánh
+  const currentTimeMs = Math.round(currentTimeSec * 1000);
+
+  // LOGIC SO KHỚP KHOẢNG THỜI GIAN THEO YÊU CẦU 3:
+  const activeIndex = subtitles.findIndex((sub) => {
+    const startMs =
+      typeof (sub as any).startTime === 'number'
+        ? (sub as any).startTime
+        : Math.round((sub.start || 0) * 1000);
+
+    const durMs =
+      typeof (sub as any).duration === 'number'
+        ? ((sub as any).duration < 200 ? Math.round((sub as any).duration * 1000) : (sub as any).duration)
+        : Math.round((((sub.end || 0) - (sub.start || 0))) * 1000);
+
+    return currentTimeMs >= startMs && currentTimeMs <= (startMs + durMs);
+  });
+
   const activeSubtitle =
-    subtitles.find((sub) => {
-      const startTime =
-        typeof sub.start === 'number'
-          ? sub.start
-          : typeof (sub as any).startTime === 'number'
-          ? (sub as any).startTime / 1000
-          : 0;
-
-      const duration =
-        typeof (sub as any).duration === 'number'
-          ? ((sub as any).duration > 500 ? (sub as any).duration / 1000 : (sub as any).duration)
-          : typeof sub.end === 'number'
-          ? sub.end - startTime
-          : 0;
-
-      const endTime = startTime + duration;
-      return currentTimeSec >= startTime && currentTimeSec < endTime;
-    }) ||
+    (activeIndex !== -1 ? subtitles[activeIndex] : null) ||
     [...subtitles].reverse().find((sub) => {
-      const startTime =
-        typeof sub.start === 'number'
-          ? sub.start
-          : typeof (sub as any).startTime === 'number'
-          ? (sub as any).startTime / 1000
-          : 0;
-      return currentTimeSec >= startTime;
+      const startMs =
+        typeof (sub as any).startTime === 'number'
+          ? (sub as any).startTime
+          : Math.round((sub.start || 0) * 1000);
+      return currentTimeMs >= startMs;
     }) ||
     (subtitles.length > 0 ? subtitles[0] : null);
 
@@ -209,6 +205,7 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
         videoId={video.id}
         isPlaying={isPlaying}
         playbackRate={playbackRate}
+        subtitles={subtitles}
         activeSubtitle={activeSubtitle}
         showInVideoSubtitle={showInVideoSubtitle}
         onTogglePlayPause={handleTogglePlayPause}
@@ -221,6 +218,7 @@ export const YoutubeStudyScreen: React.FC<YoutubeStudyScreenProps> = ({
           subtitles={subtitles}
           currentTimeSec={currentTimeSec}
           activeSubtitleId={activeSubtitle?.id || null}
+          activeIndex={activeIndex}
           isLoopingSentence={isLoopingSentence}
           onSelectSegment={handleSelectSegment}
           onOpenBreakdown={handleOpenBreakdown}

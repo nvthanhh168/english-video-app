@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { CustomYoutubePlayer as WebPlayer } from './CustomYoutubePlayer.web';
 
-export type { CustomYoutubePlayerRef } from './CustomYoutubePlayer.web';
+export type { CustomYoutubePlayerRef, SubtitleItem, CustomYoutubePlayerProps } from './CustomYoutubePlayer.native';
 
 let PlayerComponent: any;
 

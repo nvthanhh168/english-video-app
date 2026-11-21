@@ -29,6 +29,7 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
   // Trạng thái phụ đề và video
   const [subtitles, setSubtitles] = useState<YoutubeApiSubtitle[]>(initialSubtitles);
   const [activeSubtitle, setActiveSubtitle] = useState<YoutubeApiSubtitle | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number>(-1); // YÊU CẦU 3: Lưu activeIndex vào state để render giao diện
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
@@ -49,35 +50,31 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
 
       isQuerying = true;
       try {
-        const timeSec = await playerRef.current.getCurrentTime();
+        // YÊU CẦU 3: getCurrentTime() trả về giây (vd: 1.5s), nhân 1000 để đổi ra mili-giây trước khi so sánh
+        const timeSec = await playerRef.current?.getCurrentTime();
         if (isMounted && typeof timeSec === 'number' && !isNaN(timeSec)) {
-          const currentMs = Math.round(timeSec * 1000);
-          setCurrentTimeMs(currentMs);
+          const currentTimeMs = timeSec * 1000;
+          setCurrentTimeMs(currentTimeMs);
 
-          // LOGIC SO KHỚP KHOẢNG THỜI GIAN (SUBTITLE SYNC):
-          // Thay vì tìm chính xác (===), dùng hàm find để tìm câu phụ đề mà
-          // currentTime nằm giữa startTime và endTime (với endTime = startTime + duration).
-          const matched = subtitles.find((sub) => {
-            const startTime =
-              typeof sub.startTime === 'number'
-                ? sub.startTime
-                : typeof (sub as any).start === 'number'
-                ? Math.round((sub as any).start * 1000)
-                : 0;
+          // LOGIC TÌM PHỤ ĐỀ ĐANG NÓI THEO YÊU CẦU 3:
+          const activeIdx = subtitles.findIndex(
+            (sub) => currentTimeMs >= sub.startTime && currentTimeMs <= (sub.startTime + sub.duration)
+          );
 
-            const duration =
-              typeof sub.duration === 'number'
-                ? (sub.duration < 200 ? Math.round(sub.duration * 1000) : sub.duration)
-                : typeof (sub as any).end === 'number'
-                ? Math.round((sub as any).end * 1000) - startTime
-                : 0;
+          // Lưu activeIndex vào state để render giao diện
+          setActiveIndex(activeIdx);
 
-            const endTime = startTime + duration;
-            return currentMs >= startTime && currentMs < endTime;
-          });
-
-          if (matched && matched.id !== activeSubtitle?.id) {
-            setActiveSubtitle(matched);
+          if (activeIdx !== -1) {
+            const matched = subtitles[activeIdx];
+            if (matched.id !== activeSubtitle?.id) {
+              setActiveSubtitle(matched);
+            }
+          } else {
+            // Giữ câu vừa phát nếu đang trong khoảng lặng ngắn giữa 2 câu
+            const lastSpoken = [...subtitles].reverse().find((sub) => currentTimeMs >= sub.startTime);
+            if (lastSpoken && lastSpoken.id !== activeSubtitle?.id) {
+              setActiveSubtitle(lastSpoken);
+            }
           }
 
           // Xử lý Lặp câu (A-B Sentence Looping)
@@ -92,8 +89,8 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
                 : Math.round((((activeSubtitle as any).end || 0) - ((activeSubtitle as any).start || 0)) * 1000);
             const endMs = startMs + durationMs;
 
-            if (currentMs >= endMs) {
-              playerRef.current.seekTo?.(startMs / 1000, true);
+            if (currentTimeMs >= endMs) {
+              playerRef.current?.seekTo?.(startMs / 1000, true);
             }
           }
         }
@@ -256,6 +253,7 @@ export function useYoutubeSync(options: UseYoutubeSyncOptions = {}) {
     playerRef,
     subtitles,
     activeSubtitle,
+    activeIndex, // YÊU CẦU 3: Trả về activeIndex để render giao diện
     currentTimeMs,
     isPlaying,
     playbackRate,

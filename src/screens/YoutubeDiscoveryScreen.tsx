@@ -32,22 +32,55 @@ import {
   importedToYoutubeVideo,
 } from '../services/savedVideosStorage';
 
+const isCorruptedOrDummySubtitles = (subs?: YoutubeSubtitleSegment[]) => {
+  if (!subs || subs.length === 0) return true;
+  return subs.some(
+    (s) =>
+      s.textEn?.includes('continuous daily immersion') ||
+      s.textEn?.includes('Welcome back! Today we are exploring')
+  );
+};
+
 export const YoutubeDiscoveryScreen: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<YoutubeVideoItem | null>(null);
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>('Đang phân tích và dịch phụ đề AI...');
   const [savedVideos, setSavedVideos] = useState<YoutubeVideoItem[]>([]);
 
-  // Tải danh sách video đã lưu từ mảng 'imported_videos' trong AsyncStorage khi khởi chạy
+  // Tải danh sách video đã lưu từ mảng 'imported_videos' trong AsyncStorage khi khởi chạy,
+  // đồng thời tự động sửa chữa những video bị dính phụ đề mẫu cũ
   const loadSavedVideos = async () => {
     try {
       const asyncItems = await getImportedVideos();
       if (asyncItems && asyncItems.length > 0) {
-        setSavedVideos(asyncItems.map(importedToYoutubeVideo));
+        const mapped = asyncItems.map(importedToYoutubeVideo).map((item) => {
+          if (isCorruptedOrDummySubtitles(item.subtitles)) {
+            const foundInLib =
+              MOCK_LEVEL_LIBRARY.find((v) => v.id === item.id || (v as any).videoId === item.id) ||
+              MOCK_YOUTUBE_LIBRARY.find((v) => v.id === item.id);
+            if (foundInLib && foundInLib.subtitles && foundInLib.subtitles.length > 0) {
+              return { ...item, subtitles: foundInLib.subtitles };
+            }
+          }
+          return item;
+        });
+        setSavedVideos(mapped);
         return;
       }
     } catch {}
-    setSavedVideos(getSavedVideos());
+
+    const localItems = getSavedVideos().map((item) => {
+      if (isCorruptedOrDummySubtitles(item.subtitles)) {
+        const foundInLib =
+          MOCK_LEVEL_LIBRARY.find((v) => v.id === item.id || (v as any).videoId === item.id) ||
+          MOCK_YOUTUBE_LIBRARY.find((v) => v.id === item.id);
+        if (foundInLib && foundInLib.subtitles && foundInLib.subtitles.length > 0) {
+          return { ...item, subtitles: foundInLib.subtitles };
+        }
+      }
+      return item;
+    });
+    setSavedVideos(localItems);
   };
 
   useEffect(() => {
@@ -85,21 +118,13 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
       setIsExtracting(true);
       setLoadingText('Đang phân tích video & lưu vào AsyncStorage...');
 
-      // 1. Kiểm tra xem video này đã có sẵn trong lịch sử AsyncStorage chưa
-      // Nếu đã có: load ngay lập tức mà không cần gọi API dịch lại!
-      const existingInSaved = savedVideos.find((v) => v.id === videoId);
-      if (existingInSaved) {
-        setTimeout(() => {
-          setIsExtracting(false);
-          setSelectedVideo(existingInSaved);
-        }, 300);
-        return;
-      }
-
+      // 1. Kiểm tra xem video này có trong Thư viện 60 video thực tế chuẩn CEFR không
+      // Nếu có sẵn: lấy trực tiếp phụ đề chính xác 100% của video đó
       const existingInLib =
         MOCK_LEVEL_LIBRARY.find((v) => v.id === videoId || (v as any).videoId === videoId) ||
         MOCK_YOUTUBE_LIBRARY.find((v) => v.id === videoId);
-      if (existingInLib) {
+
+      if (existingInLib && existingInLib.subtitles && existingInLib.subtitles.length > 0) {
         await saveImportedVideo({
           videoId: existingInLib.id,
           title: existingInLib.title,
@@ -121,7 +146,17 @@ export const YoutubeDiscoveryScreen: React.FC = () => {
         return;
       }
 
-      // 2. Lấy thông tin thật từ YouTube qua oEmbed (Tiêu đề thật, Kênh thật, Thumbnail)
+      // 2. Kiểm tra xem video này đã có sẵn trong lịch sử AsyncStorage và phụ đề hợp lệ chưa
+      const existingInSaved = savedVideos.find((v) => v.id === videoId);
+      if (existingInSaved && !isCorruptedOrDummySubtitles(existingInSaved.subtitles)) {
+        setTimeout(() => {
+          setIsExtracting(false);
+          setSelectedVideo(existingInSaved);
+        }, 300);
+        return;
+      }
+
+      // 3. Lấy thông tin thật từ YouTube qua oEmbed (Tiêu đề thật, Kênh thật, Thumbnail)
       const meta = await fetchYoutubeVideoMeta(videoId);
 
       // 3. Trích xuất phụ đề (từ backend hoặc thư viện AI)

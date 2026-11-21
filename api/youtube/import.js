@@ -4,6 +4,9 @@ const INNERTUBE_CONTEXT = {
   client: {
     clientName: 'ANDROID',
     clientVersion: INNERTUBE_CLIENT_VERSION,
+    hl: 'en',
+    gl: 'US',
+    utcOffsetMinutes: 0,
   },
 };
 const INNERTUBE_USER_AGENT = `com.google.android.youtube/${INNERTUBE_CLIENT_VERSION} (Linux; U; Android 14)`;
@@ -124,7 +127,11 @@ module.exports = async function handler(req, res) {
       tracks.find((t) => t.vssId && t.vssId.includes('en')) ||
       tracks[0];
 
-    const xmlRes = await fetch(enTrack.baseUrl);
+    const xmlRes = await fetch(enTrack.baseUrl, {
+      headers: {
+        'User-Agent': INNERTUBE_USER_AGENT,
+      },
+    });
     const xml = await xmlRes.text();
 
     const rawCaptions = [];

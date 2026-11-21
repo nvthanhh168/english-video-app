@@ -11,15 +11,21 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-  }
+export interface SubtitleItem {
+  id?: string;
+  startTime?: number; // ms
+  duration?: number;  // ms
+  start?: number;     // s
+  end?: number;       // s
+  textEn?: string;
+  textVi?: string;
+  english?: string;
+  vietnamese?: string;
 }
 
 export interface CustomYoutubePlayerRef {
@@ -31,6 +37,8 @@ interface CustomYoutubePlayerProps {
   videoId: string;
   isPlaying: boolean;
   playbackRate: number; // 0.5, 0.75, 1.0, 1.25
+  subtitles?: SubtitleItem[]; // Mảng phụ đề
+  isLoadingSubtitles?: boolean; // Cờ báo đang tải phụ đề
   activeSubtitle?: {
     textEn: string;
     textVi: string;
@@ -38,6 +46,7 @@ interface CustomYoutubePlayerProps {
   showInVideoSubtitle?: boolean;
   onTogglePlayPause: () => void;
   onTimeUpdate: (currentTimeSec: number) => void;
+  onSubtitleIndexChange?: (index: number) => void;
 }
 
 export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYoutubePlayerProps>(
@@ -46,10 +55,13 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       videoId,
       isPlaying,
       playbackRate,
+      subtitles = [],
+      isLoadingSubtitles = false,
       activeSubtitle,
       showInVideoSubtitle = true,
       onTogglePlayPause,
       onTimeUpdate,
+      onSubtitleIndexChange,
     },
     ref
   ) => {
@@ -193,7 +205,7 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
       } catch {}
     }, [playbackRate]);
 
-    // 5. VÒNG LẶP ĐỒNG BỘ THỜI GIAN CHÍNH XÁC 100% TỪ YOUTUBE PLAYER
+    // 5. VÒNG LẶP ĐỒNG BỘ THỜI GIAN CHÍNH XÁC 100% TỪ YOUTUBE PLAYER (200ms / lần theo YÊU CẦU 2 & 3)
     useEffect(() => {
       const interval = setInterval(() => {
         const p = playerInstanceRef.current;
@@ -202,19 +214,42 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
             const realTime = p.getCurrentTime();
             if (typeof realTime === 'number' && !isNaN(realTime)) {
               onTimeUpdate(realTime);
+
+              // YÊU CẦU 3: Nhân 1000 để đổi ra mili-giây trước khi so sánh
+              const currentTimeMs = realTime * 1000;
+
+              if (subtitles && subtitles.length > 0) {
+                const activeIdx = subtitles.findIndex((sub) => {
+                  const startMs =
+                    typeof sub.startTime === 'number'
+                      ? sub.startTime
+                      : Math.round((sub.start || 0) * 1000);
+                  const durMs =
+                    typeof sub.duration === 'number'
+                      ? (sub.duration < 200 ? Math.round(sub.duration * 1000) : sub.duration)
+                      : Math.round(((sub.end || 0) - (sub.start || 0)) * 1000);
+                  return currentTimeMs >= startMs && currentTimeMs <= (startMs + durMs);
+                });
+
+                if (activeIdx !== -1) {
+                  onSubtitleIndexChange?.(activeIdx);
+                }
+              }
             }
           } catch {}
         }
       }, 200);
 
       return () => clearInterval(interval);
-    }, [onTimeUpdate]);
+    }, [onTimeUpdate, subtitles, onSubtitleIndexChange]);
 
     const handleTapScreen = () => {
       onTogglePlayPause();
       setShowPlayOverlay(true);
       setTimeout(() => setShowPlayOverlay(false), 700);
     };
+
+    const hasSubtitlesData = Array.isArray(subtitles) && subtitles.length > 0;
 
     return (
       <View style={styles.container}>
@@ -254,20 +289,35 @@ export const CustomYoutubePlayer = forwardRef<CustomYoutubePlayerRef, CustomYout
           )}
         </TouchableOpacity>
 
-        {/* Subtitle Container đè thẳng lên video theo YÊU CẦU 2 (Z-INDEX FIX) */}
-        {activeSubtitle && showInVideoSubtitle && (
+        {/* 
+          YÊU CẦU 4: KIỂM TRA LOADING STATE CỦA PHỤ ĐỀ
+          - Đảm bảo rằng mảng subtitles đã thực sự có dữ liệu (length > 0) trước khi render.
+          - Nếu subtitles đang rỗng (đang chờ API gọi) hoặc isLoadingSubtitles = true,
+            hiện một vòng xoay <ActivityIndicator/> hoặc dòng chữ "Đang tải phụ đề..." ở khu vực trống bên dưới video.
+        */}
+        {!hasSubtitlesData || isLoadingSubtitles ? (
           <View style={styles.inVideoSubtitleContainer} pointerEvents="none">
-            <View style={styles.inVideoSubtitleCard}>
-              <Text style={styles.inVideoTextEn} numberOfLines={2}>
-                {activeSubtitle.textEn}
-              </Text>
-              {activeSubtitle.textVi ? (
-                <Text style={styles.inVideoTextVi} numberOfLines={2}>
-                  {activeSubtitle.textVi}
-                </Text>
-              ) : null}
+            <View style={styles.loadingSubtitlesCard}>
+              <ActivityIndicator size="small" color="#38BDF8" style={{ marginRight: 8 }} />
+              <Text style={styles.loadingSubtitlesText}>Đang tải phụ đề...</Text>
             </View>
           </View>
+        ) : (
+          /* YÊU CẦU 2: SỬA LỖI TRÀN LAYOUT VÀ Z-INDEX (Z-INDEX FIX) */
+          activeSubtitle && showInVideoSubtitle && (
+            <View style={styles.inVideoSubtitleContainer} pointerEvents="none">
+              <View style={styles.inVideoSubtitleCard}>
+                <Text style={styles.inVideoTextEn} numberOfLines={2}>
+                  {activeSubtitle.textEn}
+                </Text>
+                {activeSubtitle.textVi ? (
+                  <Text style={styles.inVideoTextVi} numberOfLines={2}>
+                    {activeSubtitle.textVi}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          )
         )}
       </View>
     );
@@ -330,6 +380,26 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.95)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
+  },
+  loadingSubtitlesCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  loadingSubtitlesText: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '600',
   },
   adFreeBadge: {
     position: 'absolute',

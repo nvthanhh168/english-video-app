@@ -238,7 +238,7 @@ export async function extractAndTranslateYoutubeSubtitles(
   for (const endpoint of apiEndpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 giây để hoàn thành dịch các chunk phụ đề
 
       const response = await fetch(endpoint, {
         method: 'POST',

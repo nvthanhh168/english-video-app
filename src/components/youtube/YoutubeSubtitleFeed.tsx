@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { YoutubeSubtitleSegment } from '../../types/youtube';
@@ -13,6 +14,7 @@ interface YoutubeSubtitleFeedProps {
   subtitles: YoutubeSubtitleSegment[];
   currentTimeSec: number;
   activeSubtitleId: string | null;
+  activeIndex?: number; // YÊU CẦU 3: activeIndex từ logic so sánh mili-giây
   isLoopingSentence: boolean;
   onSelectSegment: (segment: YoutubeSubtitleSegment) => void;
   onOpenBreakdown: (segment: YoutubeSubtitleSegment) => void;
@@ -23,6 +25,7 @@ export const YoutubeSubtitleFeed: React.FC<YoutubeSubtitleFeedProps> = ({
   subtitles,
   currentTimeSec,
   activeSubtitleId,
+  activeIndex,
   isLoopingSentence,
   onSelectSegment,
   onOpenBreakdown,
@@ -39,14 +42,19 @@ export const YoutubeSubtitleFeed: React.FC<YoutubeSubtitleFeedProps> = ({
 
   // Tự động cuộn đến câu đang phát (Auto-scroll to active sentence)
   useEffect(() => {
-    if (activeSubtitleId && itemLayouts.current[activeSubtitleId] !== undefined) {
-      const yPos = itemLayouts.current[activeSubtitleId];
+    const targetId =
+      activeIndex !== undefined && activeIndex !== -1 && subtitles[activeIndex]
+        ? subtitles[activeIndex].id
+        : activeSubtitleId;
+
+    if (targetId && itemLayouts.current[targetId] !== undefined) {
+      const yPos = itemLayouts.current[targetId];
       scrollRef.current?.scrollTo({
         y: Math.max(0, yPos - 80),
         animated: true,
       });
     }
-  }, [activeSubtitleId]);
+  }, [activeSubtitleId, activeIndex, subtitles]);
 
   return (
     <View style={styles.container}>
@@ -64,14 +72,27 @@ export const YoutubeSubtitleFeed: React.FC<YoutubeSubtitleFeedProps> = ({
         )}
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {subtitles.map((sub, index) => {
-          const isActive = sub.id === activeSubtitleId;
+      {/* YÊU CẦU 4: KIỂM TRA LOADING STATE CỦA PHỤ ĐỀ */}
+      {!subtitles || subtitles.length === 0 ? (
+        <View style={styles.emptyFeedLoadingContainer}>
+          <ActivityIndicator size="large" color="#38BDF8" style={{ marginBottom: 12 }} />
+          <Text style={styles.emptyFeedLoadingText}>Đang tải phụ đề...</Text>
+          <Text style={styles.emptyFeedLoadingSubtext}>
+            Hệ thống AI đang phân tích và đồng bộ các câu thoại của video
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {subtitles.map((sub, index) => {
+            const isActive =
+              activeIndex !== undefined && activeIndex !== -1
+                ? index === activeIndex
+                : sub.id === activeSubtitleId;
 
           return (
             <View
@@ -154,6 +175,7 @@ export const YoutubeSubtitleFeed: React.FC<YoutubeSubtitleFeedProps> = ({
           );
         })}
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -325,5 +347,25 @@ const styles = StyleSheet.create({
   keywordVi: {
     color: '#86EFAC',
     fontSize: 11,
+  },
+  emptyFeedLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+  },
+  emptyFeedLoadingText: {
+    color: '#38BDF8',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  emptyFeedLoadingSubtext: {
+    color: '#64748B',
+    fontSize: 12.5,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 280,
   },
 });
